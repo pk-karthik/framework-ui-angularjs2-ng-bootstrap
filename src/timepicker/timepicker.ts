@@ -27,12 +27,16 @@ const NGB_TIMEPICKER_VALUE_ACCESSOR = {
       position: relative;
       top: 0.15em;
       transform: rotate(-45deg);
+      -webkit-transform: rotate(-45deg);
+      -ms-transform: rotate(-45deg);
       vertical-align: middle;
       width: 0.71em;
     }
     
     .chevron.bottom:before {
       top: -.3em;
+      -webkit-transform: rotate(135deg);
+      -ms-transform: rotate(135deg);
       transform: rotate(135deg);
     }
     
@@ -44,19 +48,23 @@ const NGB_TIMEPICKER_VALUE_ACCESSOR = {
       cursor: not-allowed;
       opacity: .65;
     }
+    
+    input {
+      text-align: center;
+    }
   `],
   template: `
      <fieldset [disabled]="disabled" [class.disabled]="disabled">
       <table>
         <tr *ngIf="spinners">
-          <td class="text-xs-center">
+          <td class="text-center">
             <button type="button" class="btn-link" (click)="changeHour(hourStep)"
               [disabled]="disabled" [class.disabled]="disabled">
               <span class="chevron"></span>
             </button>
           </td>
           <td>&nbsp;</td>
-          <td class="text-xs-center">
+          <td class="text-center">
             <button type="button" class="btn-link" (click)="changeMinute(minuteStep)"
               [disabled]="disabled" [class.disabled]="disabled">
                 <span class="chevron"></span>
@@ -64,7 +72,7 @@ const NGB_TIMEPICKER_VALUE_ACCESSOR = {
           </td>
           <template [ngIf]="seconds">
             <td>&nbsp;</td>
-            <td class="text-xs-center">
+            <td class="text-center">
               <button type="button" class="btn-link" (click)="changeSecond(secondStep)"
                 [disabled]="disabled" [class.disabled]="disabled">
                 <span class="chevron"></span>
@@ -97,19 +105,19 @@ const NGB_TIMEPICKER_VALUE_ACCESSOR = {
           <template [ngIf]="meridian">
             <td>&nbsp;&nbsp;</td>
             <td>
-              <button type="button" class="btn btn-outline-primary" (click)="toggleMeridian()">{{model.hour > 12 ? 'PM' : 'AM'}}</button>
+              <button type="button" class="btn btn-outline-primary" (click)="toggleMeridian()">{{model.hour >= 12 ? 'PM' : 'AM'}}</button>
             </td>
           </template>
         </tr>
         <tr *ngIf="spinners">
-          <td class="text-xs-center">
+          <td class="text-center">
             <button type="button" class="btn-link" (click)="changeHour(-hourStep)" 
               [disabled]="disabled" [class.disabled]="disabled">
               <span class="chevron bottom"></span>
             </button>
           </td>
           <td>&nbsp;</td>
-          <td class="text-xs-center">
+          <td class="text-center">
             <button type="button" class="btn-link" (click)="changeMinute(-minuteStep)"
               [disabled]="disabled" [class.disabled]="disabled">
               <span class="chevron bottom"></span>
@@ -117,7 +125,7 @@ const NGB_TIMEPICKER_VALUE_ACCESSOR = {
           </td>
           <template [ngIf]="seconds">
             <td>&nbsp;</td>
-            <td class="text-xs-center">
+            <td class="text-center">
               <button type="button" class="btn-link" (click)="changeSecond(-secondStep)"
                 [disabled]="disabled" [class.disabled]="disabled">
                 <span class="chevron bottom"></span>
@@ -201,71 +209,54 @@ export class NgbTimepicker implements ControlValueAccessor,
 
   setDisabledState(isDisabled: boolean) { this.disabled = isDisabled; }
 
-  /**
-   * @internal
-   */
   changeHour(step: number) {
     this.model.changeHour(step);
     this.propagateModelChange();
   }
 
-  /**
-   * @internal
-   */
   changeMinute(step: number) {
     this.model.changeMinute(step);
     this.propagateModelChange();
   }
 
-  /**
-   * @internal
-   */
   changeSecond(step: number) {
     this.model.changeSecond(step);
     this.propagateModelChange();
   }
 
-  /**
-   * @internal
-   */
   updateHour(newVal: string) {
     this.model.updateHour(toInteger(newVal));
     this.propagateModelChange();
   }
 
-  /**
-   * @internal
-   */
   updateMinute(newVal: string) {
     this.model.updateMinute(toInteger(newVal));
     this.propagateModelChange();
   }
 
-  /**
-   * @internal
-   */
   updateSecond(newVal: string) {
     this.model.updateSecond(toInteger(newVal));
     this.propagateModelChange();
   }
 
-  /**
-   * @internal
-   */
   toggleMeridian() {
     if (this.meridian) {
       this.changeHour(12);
     }
   }
 
-  /**
-   * @internal
-   */
-  formatHour(value: number) { return padNumber(isNumber(value) ? (value % (this.meridian ? 12 : 24)) : NaN); }
+  formatHour(value: number) {
+    if (isNumber(value)) {
+      if (this.meridian) {
+        return padNumber(value % 12 === 0 ? 12 : value % 12);
+      } else {
+        return padNumber(value % 24);
+      }
+    } else {
+      return padNumber(NaN);
+    }
+  }
 
-  /**
-   * @internal
-   */
   formatMinSec(value: number) { return padNumber(value); }
 
 
@@ -287,5 +278,3 @@ export class NgbTimepicker implements ControlValueAccessor,
     }
   }
 }
-
-export const NGB_TIMEPICKER_DIRECTIVES = [NgbTimepicker];

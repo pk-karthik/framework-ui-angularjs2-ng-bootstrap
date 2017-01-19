@@ -50,15 +50,13 @@ cd ng-bootstrap
 git remote add upstream https://github.com/ng-bootstrap/ng-bootstrap.git
 ```
 
-## Installing NPM Modules and typings
+## Installing NPM Modules
 
 Next, install the JavaScript modules needed to build and test ng-bootstrap:
 
 ```shell
 # Install ng-bootstrap project dependencies (package.json)
 npm install
-# Install types
-npm run typings install
 ```
 
 Globally install gulp as follows:
@@ -135,7 +133,7 @@ to some whitespace difference.
 * You can run this as a **git pre-commit hook** to automatically format your delta regions when you
   commit a change. In the ng-bootstrap repo, run
 
-```
+```shell
     $ echo -e '#!/bin/sh\nexec git clang-format' > .git/hooks/pre-commit
     $ chmod u+x !$
 ```

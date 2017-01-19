@@ -2,6 +2,8 @@ import {
   Component,
   Directive,
   Input,
+  Output,
+  EventEmitter,
   ChangeDetectionStrategy,
   OnInit,
   OnDestroy,
@@ -23,9 +25,8 @@ import {NgbPopoverConfig} from './popover-config';
 @Component({
   selector: 'ngb-popover-window',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {'[class]': '"popover in popover-" + placement', 'role': 'tooltip'},
+  host: {'[class]': '"popover show popover-" + placement', 'role': 'tooltip'},
   template: `
-    <div class="popover-arrow"></div>
     <h3 class="popover-title">{{title}}</h3><div class="popover-content"><ng-content></ng-content></div>
     `
 })
@@ -46,7 +47,7 @@ export class NgbPopover implements OnInit, OnDestroy {
   /**
    * Title of a popover.
    */
-  @Input() title: string;
+  @Input() popoverTitle: string;
   /**
    * Placement of a popover. Accepts: "top", "bottom", "left", "right"
    */
@@ -55,6 +56,19 @@ export class NgbPopover implements OnInit, OnDestroy {
    * Specifies events that should trigger. Supports a space separated list of event names.
    */
   @Input() triggers: string;
+  /**
+   * A selector specifying the element the popover should be appended to.
+   * Currently only supports "body".
+   */
+  @Input() container: string;
+  /**
+   * Emits an event when the popover is shown
+   */
+  @Output() shown = new EventEmitter();
+  /**
+   * Emits an event when the popover is hidden
+   */
+  @Output() hidden = new EventEmitter();
 
   private _popupService: PopupService<NgbPopoverWindow>;
   private _windowRef: ComponentRef<NgbPopoverWindow>;
@@ -67,25 +81,37 @@ export class NgbPopover implements OnInit, OnDestroy {
       ngZone: NgZone) {
     this.placement = config.placement;
     this.triggers = config.triggers;
+    this.container = config.container;
     this._popupService = new PopupService<NgbPopoverWindow>(
         NgbPopoverWindow, injector, viewContainerRef, _renderer, componentFactoryResolver);
 
     this._zoneSubscription = ngZone.onStable.subscribe(() => {
       if (this._windowRef) {
-        positionElements(this._elementRef.nativeElement, this._windowRef.location.nativeElement, this.placement);
+        positionElements(
+            this._elementRef.nativeElement, this._windowRef.location.nativeElement, this.placement,
+            this.container === 'body');
       }
     });
   }
 
-
   /**
    * Opens an element’s popover. This is considered a “manual” triggering of the popover.
+   * The context is an optional value to be injected into the popover template when it is created.
    */
-  open() {
+  open(context?: any) {
     if (!this._windowRef) {
-      this._windowRef = this._popupService.open(this.ngbPopover);
+      this._windowRef = this._popupService.open(this.ngbPopover, context);
       this._windowRef.instance.placement = this.placement;
-      this._windowRef.instance.title = this.title;
+      this._windowRef.instance.title = this.popoverTitle;
+
+      if (this.container === 'body') {
+        window.document.querySelector(this.container).appendChild(this._windowRef.location.nativeElement);
+      }
+
+      // we need to manually invoke change detection since events registered via
+      // Renderer::listen() are not picked up by change detection with the OnPush strategy
+      this._windowRef.changeDetectorRef.markForCheck();
+      this.shown.emit();
     }
   }
 
@@ -93,8 +119,11 @@ export class NgbPopover implements OnInit, OnDestroy {
    * Closes an element’s popover. This is considered a “manual” triggering of the popover.
    */
   close(): void {
-    this._popupService.close();
-    this._windowRef = null;
+    if (this._windowRef) {
+      this._popupService.close();
+      this._windowRef = null;
+      this.hidden.emit();
+    }
   }
 
   /**
@@ -108,6 +137,11 @@ export class NgbPopover implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Returns whether or not the popover is currently being shown
+   */
+  isOpen(): boolean { return this._windowRef != null; }
+
   ngOnInit() {
     this._unregisterListenersFn = listenToTriggers(
         this._renderer, this._elementRef.nativeElement, this.triggers, this.open.bind(this), this.close.bind(this),
@@ -115,9 +149,8 @@ export class NgbPopover implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.close();
     this._unregisterListenersFn();
     this._zoneSubscription.unsubscribe();
   }
 }
-
-export const NGB_POPOVER_DIRECTIVES = [NgbPopover, NgbPopoverWindow];

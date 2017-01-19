@@ -8,16 +8,20 @@ import {
   ComponentFactoryResolver,
   NgZone,
   TemplateRef,
-  forwardRef
+  forwardRef,
+  EventEmitter,
+  Output
 } from '@angular/core';
 import {ControlValueAccessor, NG_VALUE_ACCESSOR} from '@angular/forms';
 
 import {NgbDate} from './ngb-date';
-import {NgbDatepicker} from './datepicker';
+import {NgbDatepicker, NgbDatepickerNavigateEvent} from './datepicker';
 import {DayTemplateContext} from './datepicker-day-template-context';
 import {NgbDateParserFormatter} from './ngb-date-parser-formatter';
 
 import {positionElements} from '../util/positioning';
+import {NgbDateStruct} from './ngb-date-struct';
+import {NgbDatepickerService} from './datepicker-service';
 
 const NGB_DATEPICKER_VALUE_ACCESSOR = {
   provide: NG_VALUE_ACCESSOR,
@@ -32,7 +36,7 @@ const NGB_DATEPICKER_VALUE_ACCESSOR = {
 @Directive({
   selector: 'input[ngbDatepicker]',
   exportAs: 'ngbDatepicker',
-  host: {'(change)': 'manualDateChange($event.target.value)', '(keyup.esc)': 'close()'},
+  host: {'(change)': 'manualDateChange($event.target.value)', '(keyup.esc)': 'close()', '(blur)': 'onBlur()'},
   providers: [NGB_DATEPICKER_VALUE_ACCESSOR]
 })
 export class NgbInputDatepicker implements ControlValueAccessor {
@@ -46,29 +50,42 @@ export class NgbInputDatepicker implements ControlValueAccessor {
   @Input() dayTemplate: TemplateRef<DayTemplateContext>;
 
   /**
-   * First day of the week, 0=Sun, 1=Mon, etc.
+   * Number of months to display
+   */
+  @Input() displayMonths: number;
+
+  /**
+  * First day of the week. With default calendar we use ISO 8601: 1=Mon ... 7=Sun
    */
   @Input() firstDayOfWeek: number;
 
   /**
-   * Callback to mark a given date as disabled
+   * Callback to mark a given date as disabled.
+   * 'Current' contains the month that will be displayed in the view
    */
-  @Input() markDisabled: (date: {year: number, month: number, day: number}) => boolean;
+  @Input() markDisabled: (date: NgbDateStruct, current: {year: number, month: number}) => boolean;
 
   /**
    * Min date for the navigation. If not provided will be 10 years before today or `startDate`
    */
-  @Input() minDate: {year: number, month: number, day: number};
+  @Input() minDate: NgbDateStruct;
 
   /**
    * Max date for the navigation. If not provided will be 10 years from today or `startDate`
    */
-  @Input() maxDate: {year: number, month: number, day: number};
+  @Input() maxDate: NgbDateStruct;
 
   /**
-   * Whether to display navigation or not
+   * Navigation type: `select` (default with select boxes for month and year), `arrows`
+   * (without select boxes, only navigation arrows) or `none` (no navigation at all)
    */
-  @Input() showNavigation: boolean;
+  @Input() navigation: 'select' | 'arrows' | 'none';
+
+  /**
+   * The way to display days that don't belong to current month: `visible` (default),
+   * `hidden` (not displayed) or `collapsed` (not displayed with empty space collapsed)
+   */
+  @Input() outsideDays: 'visible' | 'collapsed' | 'hidden';
 
   /**
    * Whether to display days of the week
@@ -81,10 +98,18 @@ export class NgbInputDatepicker implements ControlValueAccessor {
   @Input() showWeekNumbers: boolean;
 
   /**
-   * Date to open calendar with. If nothing provided, calendar will open with current month.
+   * Date to open calendar with.
+   * With default calendar we use ISO 8601: 'month' is 1=Jan ... 12=Dec.
+   * If nothing or invalid date provided, calendar will open with current month.
    * Use 'navigateTo(date)' as an alternative
    */
   @Input() startDate: {year: number, month: number};
+
+  /**
+   * An event fired when navigation happens and currently displayed month changes.
+   * See NgbDatepickerNavigateEvent for the payload info.
+   */
+  @Output() navigate = new EventEmitter<NgbDatepickerNavigateEvent>();
 
   private _onChange = (_: any) => {};
   private _onTouched = () => {};
@@ -92,7 +117,8 @@ export class NgbInputDatepicker implements ControlValueAccessor {
 
   constructor(
       private _parserFormatter: NgbDateParserFormatter, private _elRef: ElementRef, private _vcRef: ViewContainerRef,
-      private _renderer: Renderer, private _cfr: ComponentFactoryResolver, ngZone: NgZone) {
+      private _renderer: Renderer, private _cfr: ComponentFactoryResolver, ngZone: NgZone,
+      private _service: NgbDatepickerService) {
     this._zoneSubscription = ngZone.onStable.subscribe(() => {
       if (this._cRef) {
         positionElements(this._elRef.nativeElement, this._cRef.location.nativeElement, 'bottom-left');
@@ -100,27 +126,16 @@ export class NgbInputDatepicker implements ControlValueAccessor {
     });
   }
 
-  /**
-   * @internal
-   */
   registerOnChange(fn: (value: any) => any): void { this._onChange = fn; }
 
-  /**
-   * @internal
-   */
   registerOnTouched(fn: () => any): void { this._onTouched = fn; }
 
-  /**
-   * @internal
-   */
   writeValue(value) {
-    this._model = value ? new NgbDate(value.year, value.month, value.day) : null;
+    this._model =
+        value ? this._service.toValidDate({year: value.year, month: value.month, day: value.day}, null) : null;
     this._writeModelValue(this._model);
   }
 
-  /**
-   * @internal
-   */
   setDisabledState(isDisabled: boolean): void {
     this._renderer.setElementProperty(this._elRef.nativeElement, 'disabled', isDisabled);
     if (this.isOpen()) {
@@ -128,11 +143,8 @@ export class NgbInputDatepicker implements ControlValueAccessor {
     }
   }
 
-  /**
-   * @internal
-   */
   manualDateChange(value: string) {
-    this._model = this._parserFormatter.parse(value);
+    this._model = this._service.toValidDate(this._parserFormatter.parse(value), null);
     this._onChange(this._model ? {year: this._model.year, month: this._model.month, day: this._model.day} : null);
     this._writeModelValue(this._model);
   }
@@ -150,6 +162,7 @@ export class NgbInputDatepicker implements ControlValueAccessor {
       this._applyPopupStyling(this._cRef.location.nativeElement);
       this._cRef.instance.writeValue(this._model);
       this._applyDatepickerInputs(this._cRef.instance);
+      this._subscribeForDatepickerOutputs(this._cRef.instance);
       this._cRef.instance.ngOnInit();
 
       // date selection event handling
@@ -183,7 +196,9 @@ export class NgbInputDatepicker implements ControlValueAccessor {
   }
 
   /**
-   * Navigates current view to provided date. If nothing provided calendar will open current month.
+   * Navigates current view to provided date.
+   * With default calendar we use ISO 8601: 'month' is 1=Jan ... 12=Dec.
+   * If nothing or invalid date provided calendar will open current month.
    * Use 'startDate' input as an alternative
    */
   navigateTo(date?: {year: number, month: number}) {
@@ -192,26 +207,33 @@ export class NgbInputDatepicker implements ControlValueAccessor {
     }
   }
 
+  onBlur() { this._onTouched(); }
+
   private _applyDatepickerInputs(datepickerInstance: NgbDatepicker): void {
-    ['dayTemplate', 'firstDayOfWeek', 'markDisabled', 'minDate', 'maxDate', 'showNavigation', 'showWeekdays',
-     'showWeekNumbers', 'startDate']
+    ['dayTemplate', 'displayMonths', 'firstDayOfWeek', 'markDisabled', 'minDate', 'maxDate', 'navigation',
+     'outsideDays', 'showNavigation', 'showWeekdays', 'showWeekNumbers']
         .forEach((optionName: string) => {
           if (this[optionName] !== undefined) {
             datepickerInstance[optionName] = this[optionName];
           }
         });
+    datepickerInstance.startDate = this.startDate || this._model;
   }
 
   private _applyPopupStyling(nativeElement: any) {
     this._renderer.setElementClass(nativeElement, 'dropdown-menu', true);
-    this._renderer.setElementStyle(nativeElement, 'display', 'block');
-    this._renderer.setElementStyle(nativeElement, 'padding', '0.40rem');
+    this._renderer.setElementStyle(nativeElement, 'padding', '0');
+  }
+
+  private _subscribeForDatepickerOutputs(datepickerInstance: NgbDatepicker) {
+    datepickerInstance.navigate.subscribe(date => this.navigate.emit(date));
   }
 
   private _writeModelValue(model: NgbDate) {
     this._renderer.setElementProperty(this._elRef.nativeElement, 'value', this._parserFormatter.format(model));
     if (this.isOpen()) {
       this._cRef.instance.writeValue(model);
+      this._onTouched();
     }
   }
 }

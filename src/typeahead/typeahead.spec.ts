@@ -1,12 +1,13 @@
-import {TestBed, ComponentFixture, async, inject} from '@angular/core/testing';
+import {TestBed, ComponentFixture, async, fakeAsync, inject, tick} from '@angular/core/testing';
 import {createGenericTestComponent, isBrowser} from '../test/common';
 import {expectResults, getWindowLinks} from '../test/typeahead/common';
 
-import {Component, DebugElement, ViewChild} from '@angular/core';
+import {Component, DebugElement, ViewChild, ChangeDetectionStrategy} from '@angular/core';
 import {Validators, FormControl, FormGroup, FormsModule, ReactiveFormsModule} from '@angular/forms';
 import {By} from '@angular/platform-browser';
-import {Observable} from 'rxjs/Rx';
+import {Observable} from 'rxjs/Observable';
 import 'rxjs/add/operator/map';
+import 'rxjs/add/operator/debounceTime';
 
 import {NgbTypeahead} from './typeahead';
 import {NgbTypeaheadModule} from './typeahead.module';
@@ -14,6 +15,9 @@ import {NgbTypeaheadConfig} from './typeahead-config';
 
 const createTestComponent = (html: string) =>
     createGenericTestComponent(html, TestComponent) as ComponentFixture<TestComponent>;
+
+const createOnPushTestComponent = (html: string) =>
+    createGenericTestComponent(html, TestOnPushComponent) as ComponentFixture<TestOnPushComponent>;
 
 enum Key {
   Tab = 9,
@@ -24,8 +28,9 @@ enum Key {
 }
 
 function createKeyDownEvent(key: number) {
-  const event = {which: key, preventDefault: () => {}};
+  const event = {which: key, preventDefault: () => {}, stopPropagation: () => {}};
   spyOn(event, 'preventDefault');
+  spyOn(event, 'stopPropagation');
   return event;
 }
 
@@ -62,8 +67,10 @@ function expectWindowResults(element, expectedResults: string[]) {
 describe('ngb-typeahead', () => {
 
   beforeEach(() => {
-    TestBed.configureTestingModule(
-        {declarations: [TestComponent], imports: [NgbTypeaheadModule, FormsModule, ReactiveFormsModule]});
+    TestBed.configureTestingModule({
+      declarations: [TestComponent, TestOnPushComponent],
+      imports: [NgbTypeaheadModule.forRoot(), FormsModule, ReactiveFormsModule]
+    });
   });
 
   describe('valueaccessor', () => {
@@ -225,6 +232,7 @@ describe('ngb-typeahead', () => {
            expectInputValue(compiled, 'one');
            expect(fixture.componentInstance.model).toBe('one');
            expect(event.preventDefault).toHaveBeenCalled();
+           expect(event.stopPropagation).toHaveBeenCalled();
          });
        }));
 
@@ -243,6 +251,7 @@ describe('ngb-typeahead', () => {
       expectInputValue(compiled, 'one');
       expect(fixture.componentInstance.model).toBe('one');
       expect(event.preventDefault).toHaveBeenCalled();
+      expect(event.stopPropagation).toHaveBeenCalled();
     });
 
     it('should make previous/next results active with up/down arrow keys', () => {
@@ -290,6 +299,92 @@ describe('ngb-typeahead', () => {
       expectWindowResults(compiled, ['+ONE', 'ONE MORE']);
     });
 
+    it('should not mark first result as active when focusFirst is false', () => {
+      const fixture = createTestComponent(`<input type="text" [ngbTypeahead]="find" [focusFirst]="false"/>`);
+      const compiled = fixture.nativeElement;
+
+      changeInput(compiled, 'o');
+      fixture.detectChanges();
+      expectWindowResults(compiled, ['one', 'one more']);
+    });
+
+    it('should properly make previous/next results active with down arrow keys when focusFirst is false', () => {
+      const fixture = createTestComponent(`<input type="text" [ngbTypeahead]="find" [focusFirst]="false"/>`);
+      const compiled = fixture.nativeElement;
+
+      changeInput(compiled, 'o');
+      fixture.detectChanges();
+      expectWindowResults(compiled, ['one', 'one more']);
+
+      // down
+      let event = createKeyDownEvent(Key.ArrowDown);
+      getDebugInput(fixture.debugElement).triggerEventHandler('keydown', event);
+      fixture.detectChanges();
+      expectWindowResults(compiled, ['+one', 'one more']);
+      expect(event.preventDefault).toHaveBeenCalled();
+
+      event = createKeyDownEvent(Key.ArrowDown);
+      getDebugInput(fixture.debugElement).triggerEventHandler('keydown', event);
+      fixture.detectChanges();
+      expectWindowResults(compiled, ['one', '+one more']);
+      expect(event.preventDefault).toHaveBeenCalled();
+
+      event = createKeyDownEvent(Key.ArrowDown);
+      getDebugInput(fixture.debugElement).triggerEventHandler('keydown', event);
+      fixture.detectChanges();
+      expectWindowResults(compiled, ['one', 'one more']);
+      expect(event.preventDefault).toHaveBeenCalled();
+    });
+
+    it('should properly make previous/next results active with up arrow keys when focusFirst is false', () => {
+      const fixture = createTestComponent(`<input type="text" [ngbTypeahead]="find" [focusFirst]="false"/>`);
+      const compiled = fixture.nativeElement;
+
+      changeInput(compiled, 'o');
+      fixture.detectChanges();
+      expectWindowResults(compiled, ['one', 'one more']);
+
+      // up
+      let event = createKeyDownEvent(Key.ArrowUp);
+      getDebugInput(fixture.debugElement).triggerEventHandler('keydown', event);
+      fixture.detectChanges();
+      expectWindowResults(compiled, ['one', '+one more']);
+      expect(event.preventDefault).toHaveBeenCalled();
+
+      event = createKeyDownEvent(Key.ArrowUp);
+      getDebugInput(fixture.debugElement).triggerEventHandler('keydown', event);
+      fixture.detectChanges();
+      expectWindowResults(compiled, ['+one', 'one more']);
+      expect(event.preventDefault).toHaveBeenCalled();
+    });
+
+    it('should not select the result on TAB, close window and not write to the input when focusFirst is false', () => {
+      const fixture =
+          createTestComponent(`<input type="text" [(ngModel)]="model" [ngbTypeahead]="find" [focusFirst]="false"/>`);
+      const compiled = fixture.nativeElement;
+
+      changeInput(compiled, 'o');
+      fixture.detectChanges();
+      expect(getWindow(compiled)).not.toBeNull();
+
+      const event = createKeyDownEvent(Key.Tab);
+      getDebugInput(fixture.debugElement).triggerEventHandler('keydown', event);
+      fixture.detectChanges();
+      expect(getWindow(compiled)).toBeNull();
+      expectInputValue(compiled, 'o');
+      expect(fixture.componentInstance.model).toBe('o');
+      expect(event.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it('should properly display results when an owning components using OnPush strategy', fakeAsync(() => {
+         const fixture = createOnPushTestComponent(`<input type="text" [(ngModel)]="model" [ngbTypeahead]="find"/>`);
+         const compiled = fixture.nativeElement;
+
+         changeInput(compiled, 'o');
+         fixture.detectChanges();
+         tick(250);
+         expectWindowResults(compiled, ['+one', 'one more']);
+       }));
   });
 
   describe('objects', () => {
@@ -377,6 +472,66 @@ describe('ngb-typeahead', () => {
            fixture.detectChanges();
            const compiled = fixture.nativeElement;
            expect(getNativeInput(compiled).disabled).toBeTruthy();
+         });
+       }));
+
+    it('should only propagate model changes on select when the editable option is on', async(() => {
+         const html = `
+            <form>
+              <input type="text" [(ngModel)]="model" name="control" required [ngbTypeahead]="find" [editable]="false"/>
+            </form>`;
+         const fixture = createTestComponent(html);
+         fixture.whenStable().then(() => {
+           fixture.detectChanges();
+           const compiled = fixture.nativeElement;
+           expect(getNativeInput(compiled)).toHaveCssClass('ng-invalid');
+           expect(getNativeInput(compiled)).not.toHaveCssClass('ng-valid');
+
+           changeInput(compiled, 'o');
+           fixture.detectChanges();
+           expect(getNativeInput(compiled)).toHaveCssClass('ng-invalid');
+           expect(getNativeInput(compiled)).not.toHaveCssClass('ng-valid');
+           expect(fixture.componentInstance.model).toBeUndefined();
+
+           const event = createKeyDownEvent(Key.Enter);
+           getDebugInput(fixture.debugElement).triggerEventHandler('keydown', event);
+           fixture.detectChanges();
+           expect(getNativeInput(compiled)).not.toHaveCssClass('ng-invalid');
+           expect(getNativeInput(compiled)).toHaveCssClass('ng-valid');
+           expect(fixture.componentInstance.model).toBe('one');
+         });
+       }));
+
+    it('should clear model on user input when the editable option is on', async(() => {
+         const html = `
+            <form>
+              <input type="text" [(ngModel)]="model" name="control" required [ngbTypeahead]="find" [editable]="false"/>
+            </form>`;
+         const fixture = createTestComponent(html);
+         fixture.whenStable().then(() => {
+           fixture.detectChanges();
+           const compiled = fixture.nativeElement;
+           expect(getNativeInput(compiled)).toHaveCssClass('ng-invalid');
+           expect(getNativeInput(compiled)).not.toHaveCssClass('ng-valid');
+
+           changeInput(compiled, 'o');
+           fixture.detectChanges();
+           expect(getNativeInput(compiled)).toHaveCssClass('ng-invalid');
+           expect(getNativeInput(compiled)).not.toHaveCssClass('ng-valid');
+           expect(fixture.componentInstance.model).toBeUndefined();
+
+           const event = createKeyDownEvent(Key.Enter);
+           getDebugInput(fixture.debugElement).triggerEventHandler('keydown', event);
+           fixture.detectChanges();
+           expect(getNativeInput(compiled)).not.toHaveCssClass('ng-invalid');
+           expect(getNativeInput(compiled)).toHaveCssClass('ng-valid');
+           expect(fixture.componentInstance.model).toBe('one');
+
+           changeInput(compiled, 'tw');
+           fixture.detectChanges();
+           expect(getNativeInput(compiled)).toHaveCssClass('ng-invalid');
+           expect(getNativeInput(compiled)).not.toHaveCssClass('ng-valid');
+           expect(fixture.componentInstance.model).toBeUndefined();
          });
        }));
   });
@@ -470,9 +625,9 @@ describe('ngb-typeahead', () => {
          }));
 
       it('should take input formatter into account when displaying hints', async(() => {
-           const fixture = createTestComponent(`<input type="text" [(ngModel)]="model" 
-                [ngbTypeahead]="findAnywhere" 
-                [inputFormatter]="uppercaseFormatter" 
+           const fixture = createTestComponent(`<input type="text" [(ngModel)]="model"
+                [ngbTypeahead]="findAnywhere"
+                [inputFormatter]="uppercaseFormatter"
                 [showHint]="true"/>`);
            const compiled = fixture.nativeElement;
            const inputEl = getNativeInput(compiled);
@@ -587,4 +742,13 @@ class TestComponent {
 
 
   onSelect($event) { this.selectEventValue = $event; }
+}
+
+@Component({selector: 'test-onpush-cmp', changeDetection: ChangeDetectionStrategy.OnPush, template: ''})
+class TestOnPushComponent {
+  private _strings = ['one', 'one more', 'two', 'three'];
+
+  find = (text$: Observable<string>) => {
+    return text$.debounceTime(200).map(text => this._strings.filter(v => v.startsWith(text)));
+  };
 }

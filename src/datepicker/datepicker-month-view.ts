@@ -5,44 +5,55 @@ import {NgbDatepickerI18n} from './datepicker-i18n';
 import {DayTemplateContext} from './datepicker-day-template-context';
 
 @Component({
-  selector: '[ngbDatepickerMonthView]',
+  selector: 'ngb-datepicker-month-view',
+  host: {'class': 'd-block'},
   styles: [`
-    .weekday {
-      padding-bottom: 0.25rem;
+    .ngb-dp-weekday, .ngb-dp-week-number {
+      line-height: 2rem;
     }
-    .weeknumber {    
+    .ngb-dp-day, .ngb-dp-weekday, .ngb-dp-week-number {
+      width: 2rem;
+      height: 2rem;      
     }
-    .day {
-      padding: 0;
-      height: 100%;
+    .ngb-dp-day {
       cursor: pointer;
     }
-    .day.disabled {
-      cursor: not-allowed;
+    .ngb-dp-day.disabled, .ngb-dp-day.hidden, .ngb-dp-day.collapsed {
+      cursor: default;
+    }
+    :host/deep/.ngb-dp-day.collapsed > * {
+      display: none;
+    }
+    :host/deep/.ngb-dp-day.hidden > * {
+      visibility: hidden;
     }
   `],
   template: `
-    <tr *ngIf="showWeekdays">
-      <td *ngIf="showWeekNumbers"></td>
-      <td *ngFor="let w of month.weekdays" class="weekday text-xs-center font-weight-bold">{{ i18n.getWeekdayName(w) }}</td>
-    </tr>
-    <tr *ngFor="let week of month.weeks">
-      <td *ngIf="showWeekNumbers" class="weeknumber small text-xs-center">{{ week.number }}</td>
-      <td *ngFor="let day of week.days" (click)="doSelect(day)" class="day" [class.disabled]="isDisabled(day)">
-        <template [ngTemplateOutlet]="dayTemplate" 
-        [ngOutletContext]="{date: {year: day.date.year, month: day.date.month, day: day.date.day}, 
-          currentMonth: month.number, 
-          disabled: isDisabled(day), 
-          selected: isSelected(day.date)}">
-        </template>
-      </td>                
-    </tr>
+    <div *ngIf="showWeekdays" class="ngb-dp-week d-flex">
+      <div *ngIf="showWeekNumbers" class="ngb-dp-weekday"></div>
+      <div *ngFor="let w of month.weekdays" class="ngb-dp-weekday small text-center text-info font-italic">
+        {{ i18n.getWeekdayShortName(w) }}
+      </div>
+    </div>
+    <div *ngFor="let week of month.weeks" class="ngb-dp-week d-flex">
+      <div *ngIf="showWeekNumbers" class="ngb-dp-week-number small text-center font-italic text-muted">{{ week.number }}</div>
+      <div *ngFor="let day of week.days" (click)="doSelect(day)" class="ngb-dp-day" [class.disabled]="isDisabled(day)"
+      [class.collapsed]="isCollapsed(day)" [class.hidden]="isHidden(day)">
+          <template [ngTemplateOutlet]="dayTemplate"
+          [ngOutletContext]="{date: {year: day.date.year, month: day.date.month, day: day.date.day},
+            currentMonth: month.number,
+            disabled: isDisabled(day),
+            selected: isSelected(day.date)}">
+          </template>
+      </div>
+    </div>
   `
 })
 export class NgbDatepickerMonthView {
   @Input() dayTemplate: TemplateRef<DayTemplateContext>;
   @Input() disabled: boolean;
   @Input() month: MonthViewModel;
+  @Input() outsideDays: 'visible' | 'hidden' | 'collapsed';
   @Input() selectedDate: NgbDate;
   @Input() showWeekdays;
   @Input() showWeekNumbers;
@@ -52,12 +63,16 @@ export class NgbDatepickerMonthView {
   constructor(public i18n: NgbDatepickerI18n) {}
 
   doSelect(day: DayViewModel) {
-    if (!this.isDisabled(day)) {
+    if (!this.isDisabled(day) && !this.isCollapsed(day) && !this.isHidden(day)) {
       this.select.emit(NgbDate.from(day.date));
     }
   }
 
-  isDisabled(day) { return this.disabled || day.disabled; }
+  isDisabled(day: DayViewModel) { return this.disabled || day.disabled; }
 
   isSelected(date: NgbDate) { return this.selectedDate && this.selectedDate.equals(date); }
+
+  isCollapsed(day: DayViewModel) { return this.outsideDays === 'collapsed' && this.month.number !== day.date.month; }
+
+  isHidden(day: DayViewModel) { return this.outsideDays === 'hidden' && this.month.number !== day.date.month; }
 }

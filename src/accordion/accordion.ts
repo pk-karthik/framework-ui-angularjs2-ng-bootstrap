@@ -1,16 +1,18 @@
 import {
+  AfterContentChecked,
   Component,
-  Input,
-  QueryList,
+  ContentChild,
   ContentChildren,
   Directive,
-  TemplateRef,
-  ContentChild,
-  Output,
   EventEmitter,
-  AfterContentChecked
+  Input,
+  Output,
+  QueryList,
+  TemplateRef
 } from '@angular/core';
+
 import {isString} from '../util/util';
+
 import {NgbAccordionConfig} from './accordion-config';
 
 let nextId = 0;
@@ -38,6 +40,11 @@ export class NgbPanelContent {
 @Directive({selector: 'ngb-panel'})
 export class NgbPanel {
   /**
+   * Defines if the tab control is focused
+   */
+  focused: boolean = false;
+
+  /**
    *  A flag determining whether the panel is disabled or not.
    *  When disabled, the panel cannot be toggled.
    */
@@ -55,7 +62,8 @@ export class NgbPanel {
   @Input() title: string;
 
   /**
-   *  Panel type (CSS class). Bootstrap 4 recognizes the following types: "success", "info", "warning" and "danger".
+   *  Accordion's types of panels to be applied per panel basis.
+   *  Bootstrap 4 recognizes the following types: "success", "info", "warning" and "danger".
    */
   @Input() type: string;
 
@@ -90,15 +98,19 @@ export interface NgbPanelChangeEvent {
 @Component({
   selector: 'ngb-accordion',
   exportAs: 'ngbAccordion',
+  host: {'role': 'tablist', '[attr.aria-multiselectable]': '!closeOtherPanels'},
   template: `
   <div class="card">
     <template ngFor let-panel [ngForOf]="panels">
-      <div [class]="'card-header ' + (panel.type ? 'card-'+panel.type: type ? 'card-'+type : '')" [class.active]="isOpen(panel.id)">
-        <a tabindex="0" href (click)="!!toggle(panel.id)" [class.text-muted]="panel.disabled">
-          {{panel.title}}<template [ngTemplateOutlet]="panel.titleTpl?.templateRef"></template>          
+      <div role="tab" id="{{panel.id}}-header" [attr.aria-selected]="panel.focused"
+        [class]="'card-header ' + (panel.type ? 'card-'+panel.type: type ? 'card-'+type : '')" [class.active]="isOpen(panel.id)">
+        <a href (click)="!!toggle(panel.id)" (focus)="panel.focused = true" 
+          (blur)="panel.focused = false" [class.text-muted]="panel.disabled" 
+          [attr.aria-expanded]="isOpen(panel.id)" [attr.aria-controls]="panel.id">
+          {{panel.title}}<template [ngTemplateOutlet]="panel.titleTpl?.templateRef"></template>
         </a>
       </div>
-      <div class="card-block" *ngIf="isOpen(panel.id)">
+      <div id="{{panel.id}}" role="tabpanel" [attr.aria-labelledby]="panel.id + '-header'" class="card-block" *ngIf="isOpen(panel.id)">
         <template [ngTemplateOutlet]="panel.contentTpl.templateRef"></template>
       </div>
     </template>
@@ -106,6 +118,16 @@ export interface NgbPanelChangeEvent {
 `
 })
 export class NgbAccordion implements AfterContentChecked {
+  /**
+   * A map that stores each panel state
+   */
+  private _states: Map<string, boolean> = new Map<string, boolean>();
+
+  /**
+   * A map that stores references to all panels
+   */
+  private _panelRefs: Map<string, NgbPanel> = new Map<string, NgbPanel>();
+
   @ContentChildren(NgbPanel) panels: QueryList<NgbPanel>;
 
   /**
@@ -119,25 +141,15 @@ export class NgbAccordion implements AfterContentChecked {
   @Input('closeOthers') closeOtherPanels: boolean;
 
   /**
-   *  Type of accordion's panels. Bootstrap 4 recognizes the following types: "success", "info", "warning" and "danger".
+   *  Accordion's types of panels to be applied globally.
+   *  Bootstrap 4 recognizes the following types: "success", "info", "warning" and "danger".
    */
   @Input() type: string;
-
 
   /**
    * A panel change event fired right before the panel toggle happens. See NgbPanelChangeEvent for payload details
    */
-  @Output() change = new EventEmitter<NgbPanelChangeEvent>();
-
-  /**
-   * A map that stores each panel state
-   */
-  private _states: Map<string, boolean> = new Map<string, boolean>();
-
-  /**
-   * A map that stores references to all panels
-   */
-  private _panelRefs: Map<string, NgbPanel> = new Map<string, NgbPanel>();
+  @Output() panelChange = new EventEmitter<NgbPanelChangeEvent>();
 
   constructor(config: NgbAccordionConfig) {
     this.type = config.type;
@@ -154,7 +166,8 @@ export class NgbAccordion implements AfterContentChecked {
       const nextState = !this._states.get(panelId);
       let defaultPrevented = false;
 
-      this.change.emit({panelId: panelId, nextState: nextState, preventDefault: () => { defaultPrevented = true; }});
+      this.panelChange.emit(
+          {panelId: panelId, nextState: nextState, preventDefault: () => { defaultPrevented = true; }});
 
       if (!defaultPrevented) {
         this._states.set(panelId, nextState);
@@ -208,5 +221,3 @@ export class NgbAccordion implements AfterContentChecked {
     });
   }
 }
-
-export const NGB_ACCORDION_DIRECTIVES = [NgbAccordion, NgbPanel, NgbPanelTitle, NgbPanelContent];

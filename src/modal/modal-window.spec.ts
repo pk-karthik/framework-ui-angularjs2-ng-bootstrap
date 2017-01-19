@@ -33,6 +33,13 @@ describe('ngb-modal-dialog', () => {
       expect(dialogEl).toHaveCssClass('modal-sm');
     });
 
+    it('should render default modal window with a specified class', () => {
+      fixture.componentInstance.windowClass = 'custom-class';
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement).toHaveCssClass('custom-class');
+    });
+
     it('aria attributes', () => {
       fixture.detectChanges();
       const dialogEl: Element = fixture.nativeElement.querySelector('.modal-dialog');
@@ -52,7 +59,16 @@ describe('ngb-modal-dialog', () => {
         done();
       });
 
-      fixture.nativeElement.querySelector('.modal-dialog').click();
+      fixture.nativeElement.click();
+    });
+
+    it('should not dismiss on modal content click when there is active backdrop', (done) => {
+      fixture.detectChanges();
+      fixture.componentInstance.dismissEvent.subscribe(
+          () => { done.fail(new Error('Should not trigger dismiss event')); });
+
+      fixture.nativeElement.querySelector('.modal-content').click();
+      setTimeout(done, 200);
     });
 
     it('should ignore backdrop clicks when there is no backdrop', (done) => {
@@ -61,7 +77,7 @@ describe('ngb-modal-dialog', () => {
 
       fixture.componentInstance.dismissEvent.subscribe(($event) => {
         expect($event).toBe(ModalDismissReasons.BACKDROP_CLICK);
-        done(new Error('Should not trigger dismiss event'));
+        done.fail(new Error('Should not trigger dismiss event'));
       });
 
       fixture.nativeElement.querySelector('.modal-dialog').click();
@@ -74,7 +90,7 @@ describe('ngb-modal-dialog', () => {
 
       fixture.componentInstance.dismissEvent.subscribe(($event) => {
         expect($event).toBe(ModalDismissReasons.BACKDROP_CLICK);
-        done(new Error('Should not trigger dismiss event'));
+        done.fail(new Error('Should not trigger dismiss event'));
       });
 
       fixture.nativeElement.querySelector('.modal-dialog').click();

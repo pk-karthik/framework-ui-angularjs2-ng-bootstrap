@@ -11,11 +11,15 @@ const createTestComponent = (html: string) =>
     createGenericTestComponent(html, TestComponent) as ComponentFixture<TestComponent>;
 
 function getBarWidth(nativeEl): string {
-  return nativeEl.querySelector('.progress-bar').style.width;
+  return getProgressbar(nativeEl).style.width;
 }
 
-function getProgressbar(nativeEl: Element): Element {
-  return nativeEl.querySelector('progress');
+function getBarValue(nativeEl): number {
+  return parseInt(getProgressbar(nativeEl).getAttribute('aria-valuenow'), 10);
+}
+
+function getProgressbar(nativeEl: Element): HTMLElement {
+  return nativeEl.querySelector('.progress-bar') as HTMLElement;
 }
 
 describe('ngb-progressbar', () => {
@@ -81,8 +85,9 @@ describe('ngb-progressbar', () => {
 
   describe('UI logic', () => {
 
-    beforeEach(
-        () => { TestBed.configureTestingModule({declarations: [TestComponent], imports: [NgbProgressbarModule]}); });
+    beforeEach(() => {
+      TestBed.configureTestingModule({declarations: [TestComponent], imports: [NgbProgressbarModule.forRoot()]});
+    });
 
     it('accepts a value and respond to value changes', () => {
       const html = '<ngb-progressbar [value]="value"></ngb-progressbar>';
@@ -93,12 +98,12 @@ describe('ngb-progressbar', () => {
       // this might fail in IE11 if attribute binding order is not respected for the <progress> element:
       // <progress [value]="" [max]=""> will fail with value = 1
       // <progress [max]="" [value]=""> will work with value = 10
-      expect(getProgressbar(fixture.nativeElement)['value']).toBe(10);
+      expect(getBarValue(fixture.nativeElement)).toBe(10);
 
       fixture.componentInstance.value = 30;
       fixture.detectChanges();
       expect(getBarWidth(fixture.nativeElement)).toBe('30%');
-      expect(getProgressbar(fixture.nativeElement)['value']).toBe(30);
+      expect(getBarValue(fixture.nativeElement)).toBe(30);
     });
 
     it('accepts a max value and respond to max changes', () => {
@@ -125,22 +130,22 @@ describe('ngb-progressbar', () => {
       const html = '<ngb-progressbar [value]="value" [type]="type"></ngb-progressbar>';
       const fixture = createTestComponent(html);
 
-      expect(getProgressbar(fixture.nativeElement)).toHaveCssClass('progress-warning');
+      expect(getProgressbar(fixture.nativeElement)).toHaveCssClass('bg-warning');
 
       fixture.componentInstance.type = 'info';
       fixture.detectChanges();
-      expect(getProgressbar(fixture.nativeElement)).toHaveCssClass('progress-info');
+      expect(getProgressbar(fixture.nativeElement)).toHaveCssClass('bg-info');
     });
 
     it('accepts animated as normal attr', () => {
       const html = '<ngb-progressbar [value]="value" [animated]="animated"></ngb-progressbar>';
       const fixture = createTestComponent(html);
 
-      expect(getProgressbar(fixture.nativeElement)).toHaveCssClass('progress-animated');
+      expect(getProgressbar(fixture.nativeElement)).toHaveCssClass('progress-bar-animated');
 
       fixture.componentInstance.animated = false;
       fixture.detectChanges();
-      expect(getProgressbar(fixture.nativeElement)).not.toHaveCssClass('progress-animated');
+      expect(getProgressbar(fixture.nativeElement)).not.toHaveCssClass('progress-bar-animated');
     });
 
 
@@ -148,11 +153,11 @@ describe('ngb-progressbar', () => {
       const html = '<ngb-progressbar [value]="value" [striped]="striped"></ngb-progressbar>';
       const fixture = createTestComponent(html);
 
-      expect(getProgressbar(fixture.nativeElement)).toHaveCssClass('progress-striped');
+      expect(getProgressbar(fixture.nativeElement)).toHaveCssClass('progress-bar-striped');
 
       fixture.componentInstance.striped = false;
       fixture.detectChanges();
-      expect(getProgressbar(fixture.nativeElement)).not.toHaveCssClass('progress-striped');
+      expect(getProgressbar(fixture.nativeElement)).not.toHaveCssClass('progress-bar-striped');
     });
 
 
@@ -160,15 +165,36 @@ describe('ngb-progressbar', () => {
       const html = '<ngb-progressbar [value]="value" [striped]="striped"></ngb-progressbar>';
       const fixture = createTestComponent(html);
 
-      expect(getProgressbar(fixture.nativeElement)).toHaveCssClass('progress-striped');
+      expect(getProgressbar(fixture.nativeElement)).toHaveCssClass('progress-bar-striped');
       expect(getProgressbar(fixture.nativeElement)).not.toHaveCssClass('false');
+    });
+
+    it('should stay striped when the type changes', () => {
+      const html = '<ngb-progressbar [value]="value" [type]="type" [striped]="true"></ngb-progressbar>';
+      const fixture = createTestComponent(html);
+
+      expect(getProgressbar(fixture.nativeElement)).toHaveCssClass('bg-warning');
+      expect(getProgressbar(fixture.nativeElement)).toHaveCssClass('progress-bar-striped');
+
+      fixture.componentInstance.type = 'success';
+      fixture.detectChanges();
+      expect(getProgressbar(fixture.nativeElement)).toHaveCssClass('bg-success');
+      expect(getProgressbar(fixture.nativeElement)).toHaveCssClass('progress-bar-striped');
+    });
+
+    it('sets the min and max values as aria attributes', () => {
+      const html = '<ngb-progressbar [value]="130" [max]="150"></ngb-progressbar>';
+      const fixture = createTestComponent(html);
+
+      expect(getProgressbar(fixture.nativeElement).getAttribute('aria-valuemin')).toBe('0');
+      expect(getProgressbar(fixture.nativeElement).getAttribute('aria-valuemax')).toBe('150');
     });
   });
 
   describe('Custom config', () => {
     let config: NgbProgressbarConfig;
 
-    beforeEach(() => { TestBed.configureTestingModule({imports: [NgbProgressbarModule]}); });
+    beforeEach(() => { TestBed.configureTestingModule({imports: [NgbProgressbarModule.forRoot()]}); });
 
     beforeEach(inject([NgbProgressbarConfig], (c: NgbProgressbarConfig) => {
       config = c;
@@ -199,7 +225,7 @@ describe('ngb-progressbar', () => {
 
     beforeEach(() => {
       TestBed.configureTestingModule(
-          {imports: [NgbProgressbarModule], providers: [{provide: NgbProgressbarConfig, useValue: config}]});
+          {imports: [NgbProgressbarModule.forRoot()], providers: [{provide: NgbProgressbarConfig, useValue: config}]});
     });
 
     it('should initialize inputs with provided config as provider', () => {

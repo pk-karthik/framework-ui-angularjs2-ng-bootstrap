@@ -12,12 +12,14 @@ import {NgbCalendar} from './ngb-calendar';
       padding: 0.25rem 0.5rem;
       font-size: 0.875rem;      
       line-height: 1.25;
+      /* to cancel the custom height set by custom-select */
+      height: inherit;
       width: 50%;
     }
   `],
   template: `
     <select [disabled]="disabled" class="custom-select d-inline-block" [value]="date.month" (change)="changeMonth($event.target.value)">
-      <option *ngFor="let m of months" [value]="m">{{ i18n.getMonthName(m) }}</option>
+      <option *ngFor="let m of months" [value]="m">{{ i18n.getMonthShortName(m) }}</option>
     </select>` +
       `<select [disabled]="disabled" class="custom-select d-inline-block" [value]="date.year" (change)="changeYear($event.target.value)">
       <option *ngFor="let y of years" [value]="y">{{ y }}</option>
@@ -30,16 +32,21 @@ export class NgbDatepickerNavigationSelect implements OnChanges {
 
   @Input() date: NgbDate;
   @Input() disabled: boolean;
-  @Input() maxYear: number;
-  @Input() minYear: number;
+  @Input() maxDate: NgbDate;
+  @Input() minDate: NgbDate;
 
   @Output() select = new EventEmitter<NgbDate>();
 
-  constructor(public i18n: NgbDatepickerI18n, calendar: NgbCalendar) { this.months = calendar.getMonths(); }
+  constructor(public i18n: NgbDatepickerI18n, private calendar: NgbCalendar) { this.months = calendar.getMonths(); }
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['maxYear'] || changes['minYear']) {
+    if (changes['maxDate'] || changes['minDate']) {
       this._generateYears();
+      this._generateMonths();
+    }
+
+    if (changes['date'] && changes['date'].currentValue.year !== changes['date'].previousValue.year) {
+      this._generateMonths();
     }
   }
 
@@ -47,7 +54,21 @@ export class NgbDatepickerNavigationSelect implements OnChanges {
 
   changeYear(year: string) { this.select.emit(new NgbDate(toInteger(year), this.date.month, 1)); }
 
+  private _generateMonths() {
+    this.months = this.calendar.getMonths();
+
+    if (this.date.year === this.minDate.year) {
+      const index = this.months.findIndex(month => month === this.minDate.month);
+      this.months = this.months.slice(index);
+    }
+
+    if (this.date.year === this.maxDate.year) {
+      const index = this.months.findIndex(month => month === this.maxDate.month);
+      this.months = this.months.slice(0, index + 1);
+    }
+  }
+
   private _generateYears() {
-    this.years = Array.from({length: this.maxYear - this.minYear + 1}, (e, i) => this.minYear + i);
+    this.years = Array.from({length: this.maxDate.year - this.minDate.year + 1}, (e, i) => this.minDate.year + i);
   }
 }

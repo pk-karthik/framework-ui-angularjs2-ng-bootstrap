@@ -38,8 +38,8 @@ export class NgbSlide {
     'tabIndex': '0',
     '(mouseenter)': 'pause()',
     '(mouseleave)': 'cycle()',
-    '(keyup.arrowLeft)': 'keyPrev()',
-    '(keyup.arrowRight)': 'keyNext()'
+    '(keydown.arrowLeft)': 'keyPrev()',
+    '(keydown.arrowRight)': 'keyNext()'
   },
   template: `
     <ol class="carousel-indicators">
@@ -50,12 +50,12 @@ export class NgbSlide {
         <template [ngTemplateOutlet]="slide.tplRef"></template>
       </div>
     </div>
-    <a class="left carousel-control" role="button" (click)="cycleToPrev()">
-      <span class="icon-prev" aria-hidden="true"></span>
+    <a class="left carousel-control-prev" role="button" (click)="cycleToPrev()">
+      <span class="carousel-control-prev-icon" aria-hidden="true"></span>
       <span class="sr-only">Previous</span>
     </a>
-    <a class="right carousel-control" role="button" (click)="cycleToNext()">
-      <span class="icon-next" aria-hidden="true"></span>
+    <a class="right carousel-control-next" role="button" (click)="cycleToNext()">
+      <span class="carousel-control-next-icon" aria-hidden="true"></span>
       <span class="sr-only">Next</span>
     </a>
     `
@@ -66,22 +66,22 @@ export class NgbCarousel implements AfterContentChecked,
   private _slideChangeInterval;
 
   /**
-   *  Amount of time in milliseconds before next slide is shown.
+   * Amount of time in milliseconds before next slide is shown.
    */
   @Input() interval: number;
 
   /**
-   *  Whether can wrap from the last to the first slide.
+   * Whether can wrap from the last to the first slide.
    */
   @Input() wrap: boolean;
 
   /**
-   *  A flag for allowing navigation via keyboard
+   * A flag for allowing navigation via keyboard
    */
   @Input() keyboard: boolean;
 
   /**
-   *  The active slide id.
+   * The active slide id.
    */
   @Input() activeId: string;
 
@@ -101,10 +101,10 @@ export class NgbCarousel implements AfterContentChecked,
   ngOnDestroy() { clearInterval(this._slideChangeInterval); }
 
   /**
-   * Navigate to a slide with a specified identifier.
+   * Navigate to a slide with the specified identifier.
    */
-  select(slideIdx: string) {
-    this.cycleToSelected(slideIdx);
+  select(slideId: string) {
+    this.cycleToSelected(slideId);
     this._restartTimer();
   }
 
@@ -134,19 +134,10 @@ export class NgbCarousel implements AfterContentChecked,
    */
   cycle() { this._startTimer(); }
 
-  /**
-   * @internal
-   */
   cycleToNext() { this.cycleToSelected(this._getNextSlide(this.activeId)); }
 
-  /**
-   * @internal
-   */
   cycleToPrev() { this.cycleToSelected(this._getPrevSlide(this.activeId)); }
 
-  /**
-   * @internal
-   */
   cycleToSelected(slideIdx: string) {
     let selectedSlide = this._getSlideById(slideIdx);
     if (selectedSlide) {
@@ -154,18 +145,12 @@ export class NgbCarousel implements AfterContentChecked,
     }
   }
 
-  /**
-   * @internal
-   */
   keyPrev() {
     if (this.keyboard) {
       this.prev();
     }
   }
 
-  /**
-   * @internal
-   */
   keyNext() {
     if (this.keyboard) {
       this.next();
@@ -178,7 +163,9 @@ export class NgbCarousel implements AfterContentChecked,
   }
 
   private _startTimer() {
-    this._slideChangeInterval = setInterval(() => { this.cycleToNext(); }, this.interval);
+    if (this.interval > 0) {
+      this._slideChangeInterval = setInterval(() => { this.cycleToNext(); }, this.interval);
+    }
   }
 
   private _stopTimer() { clearInterval(this._slideChangeInterval); }

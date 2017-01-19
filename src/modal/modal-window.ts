@@ -15,16 +15,16 @@ import {ModalDismissReasons} from './modal-dismiss-reasons';
 @Component({
   selector: 'ngb-modal-window',
   host: {
-    'class': 'modal fade in',
+    '[class]': '"modal fade show" + (windowClass ? " " + windowClass : "")',
     'role': 'dialog',
     'tabindex': '-1',
     'style': 'display: block;',
     '(keyup.esc)': 'escKey($event)',
-    '(click)': 'backdropClick()'
+    '(click)': 'backdropClick($event)'
   },
   template: `
     <div [class]="'modal-dialog' + (size ? ' modal-' + size : '')" role="document">
-        <div class="modal-content" (click)="stopPropagation($event)"><ng-content></ng-content></div>
+        <div class="modal-content"><ng-content></ng-content></div>
     </div>
     `
 })
@@ -35,13 +35,14 @@ export class NgbModalWindow implements OnInit,
   @Input() backdrop: boolean | string = true;
   @Input() keyboard = true;
   @Input() size: string;
+  @Input() windowClass: string;
 
   @Output('dismiss') dismissEvent = new EventEmitter();
 
   constructor(private _elRef: ElementRef, private _renderer: Renderer) {}
 
-  backdropClick(): void {
-    if (this.backdrop === true) {
+  backdropClick($event): void {
+    if (this.backdrop === true && this._elRef.nativeElement === $event.target) {
       this.dismiss(ModalDismissReasons.BACKDROP_CLICK);
     }
   }
@@ -54,21 +55,19 @@ export class NgbModalWindow implements OnInit,
 
   dismiss(reason): void { this.dismissEvent.emit(reason); }
 
-  stopPropagation($event: MouseEvent): void { $event.stopPropagation(); }
-
   ngOnInit() {
     this._elWithFocus = document.activeElement;
     this._renderer.setElementClass(document.body, 'modal-open', true);
   }
 
   ngAfterViewInit() {
-    if (!this._isNodeChildOfAnother(this._elRef.nativeElement, document.activeElement)) {
+    if (!this._elRef.nativeElement.contains(document.activeElement)) {
       this._renderer.invokeElementMethod(this._elRef.nativeElement, 'focus', []);
     }
   }
 
   ngOnDestroy() {
-    if (this._elWithFocus && this._isNodeChildOfAnother(document.body, this._elWithFocus)) {
+    if (this._elWithFocus && document.body.contains(this._elWithFocus)) {
       this._renderer.invokeElementMethod(this._elWithFocus, 'focus', []);
     } else {
       this._renderer.invokeElementMethod(document.body, 'focus', []);
@@ -77,6 +76,4 @@ export class NgbModalWindow implements OnInit,
     this._elWithFocus = null;
     this._renderer.setElementClass(document.body, 'modal-open', false);
   }
-
-  private _isNodeChildOfAnother(parentNode, potentialChildNode) { return parentNode.contains(potentialChildNode); }
 }

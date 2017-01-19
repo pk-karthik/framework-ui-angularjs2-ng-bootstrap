@@ -1,10 +1,12 @@
 import {Component, Injectable} from '@angular/core';
-import {} from '@angular/core';
 import {Jsonp, URLSearchParams} from '@angular/http';
-import {Observable} from 'rxjs/Rx';
+import {Observable} from 'rxjs/Observable';
+import 'rxjs/add/observable/of';
+import 'rxjs/add/operator/catch';
 import 'rxjs/add/operator/debounceTime';
 import 'rxjs/add/operator/distinctUntilChanged';
 import 'rxjs/add/operator/do';
+import 'rxjs/add/operator/map';
 import 'rxjs/add/operator/switchMap';
 
 @Injectable()
@@ -12,6 +14,10 @@ export class WikipediaService {
   constructor(private _jsonp: Jsonp) {}
 
   search(term: string) {
+    if (term === '') {
+      return Observable.of([]);
+    }
+
     let wikiUrl = 'https://en.wikipedia.org/w/api.php';
     let params = new URLSearchParams();
     params.set('search', term);
@@ -32,8 +38,9 @@ export class WikipediaService {
   styles: [`.form-control { width: 300px; display: inline; }`]
 })
 export class NgbdTypeaheadHttp {
-
-  private _searching: boolean;
+  model: any;
+  searching = false;
+  searchFailed = false;
 
   constructor(private _service: WikipediaService) {}
 
@@ -41,7 +48,13 @@ export class NgbdTypeaheadHttp {
     text$
       .debounceTime(300)
       .distinctUntilChanged()
-      .do(term => { this._searching = term.length > 0; })
-      .switchMap(term => term === '' ? Observable.of([]) : this._service.search(term))
-      .do(() => { this._searching = false; });
+      .do(() => this.searching = true)
+      .switchMap(term =>
+        this._service.search(term)
+            .do(() => this.searchFailed = false)
+            .catch(() => {
+              this.searchFailed = true;
+              return Observable.of([]);
+            }))
+      .do(() => this.searching = false);
 }

@@ -6,7 +6,7 @@ import {Directive, Input} from '@angular/core';
 @Directive({
   selector: '[ngbCollapse]',
   exportAs: 'ngbCollapse',
-  host: {'[class.collapse]': 'true', '[class.in]': '!collapsed', '[attr.aria-expanded]': '!collapsed'}
+  host: {'[class.collapse]': 'true', '[class.show]': '!collapsed', '[attr.aria-expanded]': '!collapsed'}
 })
 export class NgbCollapse {
   /**
@@ -14,5 +14,3 @@ export class NgbCollapse {
    */
   @Input('ngbCollapse') collapsed = false;
 }
-
-export const NGB_COLLAPSE_DIRECTIVES = [NgbCollapse];

@@ -110,8 +110,7 @@ describe('APIDocVisitor', function() {
   });
 
   it('should extract documentation from services', function() {
-    var serviceDocs =
-        apiDoc(['./misc/api-doc-test-cases/services-with-methods.ts', './typings/index.d.ts']).ModalService;
+    var serviceDocs = apiDoc(['./misc/api-doc-test-cases/services-with-methods.ts']).ModalService;
 
     expect(serviceDocs.fileName).toBe('./misc/api-doc-test-cases/services-with-methods.ts');
     expect(serviceDocs.className).toBe('ModalService');
@@ -124,7 +123,7 @@ describe('APIDocVisitor', function() {
     expect(serviceDocs.methods[0].returnType).toBe('Promise<any>');
 
     expect(serviceDocs.methods[1].name).toBe('isOpen');
-    expect(serviceDocs.methods[1].description).toBe('');
+    expect(serviceDocs.methods[1].description).toBe('Checks if a modal is open');
     expect(serviceDocs.methods[1].args.length).toBe(0);
     expect(serviceDocs.methods[1].returnType).toBe('boolean');
   });
@@ -189,9 +188,15 @@ describe('APIDocVisitor', function() {
     expect(classDocs.className).toBe('DocumentedFoo');
     expect(classDocs.description).toBe('This is a documented foo');
 
+    expect(classDocs.properties.length).toBe(2);
+
     expect(classDocs.properties[0].name).toBe('bar');
     expect(classDocs.properties[0].description).toContain('the bar');
     expect(classDocs.properties[0].type).toBe('string');
+
+    expect(classDocs.properties[1].name).toBe('componentInstance');
+    expect(classDocs.properties[1].description).toContain('A getter');
+    expect(classDocs.properties[1].type).toBe('any');
 
     expect(classDocs.methods.length).toBe(1);
 

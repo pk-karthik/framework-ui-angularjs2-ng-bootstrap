@@ -1,5 +1,5 @@
-import {Component, EventEmitter, Input, Output, OnChanges, ChangeDetectionStrategy} from '@angular/core';
-import {getValueInRange} from '../util/util';
+import {Component, EventEmitter, Input, Output, OnChanges, ChangeDetectionStrategy, SimpleChanges} from '@angular/core';
+import {getValueInRange, isNumber} from '../util/util';
 import {NgbPaginationConfig} from './pagination-config';
 
 /**
@@ -11,35 +11,35 @@ import {NgbPaginationConfig} from './pagination-config';
   template: `
     <nav>
       <ul [class]="'pagination' + (size ? ' pagination-' + size : '')">
-        <li *ngIf="boundaryLinks" class="page-item" [class.disabled]="!hasPrevious()">
-          <a aria-label="First" class="page-link" href (click)="!!selectPage(1)">
+        <li *ngIf="boundaryLinks" class="page-item" 
+          [class.disabled]="!hasPrevious() || disabled">
+          <a aria-label="First" class="page-link" href (click)="!!selectPage(1)" [attr.tabindex]="hasPrevious() ? null : '-1'">
             <span aria-hidden="true">&laquo;&laquo;</span>
             <span class="sr-only">First</span>
           </a>                
         </li>
       
-        <li *ngIf="directionLinks" class="page-item" [class.disabled]="!hasPrevious()">
-          <a aria-label="Previous" class="page-link" href (click)="!!selectPage(page-1)">
+        <li *ngIf="directionLinks" class="page-item" 
+          [class.disabled]="!hasPrevious() || disabled">
+          <a aria-label="Previous" class="page-link" href (click)="!!selectPage(page-1)" [attr.tabindex]="hasPrevious() ? null : '-1'">
             <span aria-hidden="true">&laquo;</span>
             <span class="sr-only">Previous</span>
           </a>
         </li>
-
         <li *ngFor="let pageNumber of pages" class="page-item" [class.active]="pageNumber === page" 
-          [class.disabled]="isEllipsis(pageNumber)">
+          [class.disabled]="isEllipsis(pageNumber) || disabled">
           <a *ngIf="isEllipsis(pageNumber)" class="page-link">...</a>
           <a *ngIf="!isEllipsis(pageNumber)" class="page-link" href (click)="!!selectPage(pageNumber)">{{pageNumber}}</a>
         </li>
-
-        <li *ngIf="directionLinks" class="page-item" [class.disabled]="!hasNext()">
-          <a aria-label="Next" class="page-link" href (click)="!!selectPage(page+1)">
+        <li *ngIf="directionLinks" class="page-item" [class.disabled]="!hasNext() || disabled">
+          <a aria-label="Next" class="page-link" href (click)="!!selectPage(page+1)" [attr.tabindex]="hasNext() ? null : '-1'">
             <span aria-hidden="true">&raquo;</span>
             <span class="sr-only">Next</span>
           </a>
         </li>
         
-        <li *ngIf="boundaryLinks" class="page-item" [class.disabled]="!hasNext()">
-          <a aria-label="Last" class="page-link" href (click)="!!selectPage(pageCount)">
+        <li *ngIf="boundaryLinks" class="page-item" [class.disabled]="!hasNext() || disabled">
+          <a aria-label="Last" class="page-link" href (click)="!!selectPage(pageCount)" [attr.tabindex]="hasNext() ? null : '-1'">
             <span aria-hidden="true">&raquo;&raquo;</span>
             <span class="sr-only">Last</span>
           </a>                
@@ -49,8 +49,13 @@ import {NgbPaginationConfig} from './pagination-config';
   `
 })
 export class NgbPagination implements OnChanges {
-  private _pageCount = 0;
+  pageCount = 0;
   pages: number[] = [];
+
+  /**
+   * Whether to disable buttons from user input
+   */
+  @Input() disabled: boolean;
 
   /**
    *  Whether to show the "First" and "Last" page links
@@ -95,9 +100,9 @@ export class NgbPagination implements OnChanges {
 
   /**
    *  An event fired when the page is changed.
-   *  Event's payload equals the current page.
+   *  Event's payload equals to the newly selected page.
    */
-  @Output() pageChange = new EventEmitter();
+  @Output() pageChange = new EventEmitter<number>(true);
 
   /**
    * Pagination display size: small or large
@@ -105,6 +110,7 @@ export class NgbPagination implements OnChanges {
   @Input() size: 'sm' | 'lg';
 
   constructor(config: NgbPaginationConfig) {
+    this.disabled = config.disabled;
     this.boundaryLinks = config.boundaryLinks;
     this.directionLinks = config.directionLinks;
     this.ellipses = config.ellipses;
@@ -114,54 +120,13 @@ export class NgbPagination implements OnChanges {
     this.size = config.size;
   }
 
-  get pageCount(): number { return this._pageCount; }
-
   hasPrevious(): boolean { return this.page > 1; }
 
-  hasNext(): boolean { return this.page < this._pageCount; }
+  hasNext(): boolean { return this.page < this.pageCount; }
 
-  selectPage(pageNumber: number): void {
-    let prevPageNo = this.page;
-    this.page = this._getPageNoInRange(pageNumber);
+  selectPage(pageNumber: number): void { this._updatePages(pageNumber); }
 
-    if (this.page !== prevPageNo) {
-      this.pageChange.emit(this.page);
-    }
-
-    this.ngOnChanges();
-  }
-
-  ngOnChanges(): void {
-    // re-calculate new length of pages
-    this._pageCount = Math.ceil(this.collectionSize / this.pageSize);
-
-    // fill-in model needed to render pages
-    this.pages.length = 0;
-    for (let i = 1; i <= this._pageCount; i++) {
-      this.pages.push(i);
-    }
-
-    // get selected page
-    this.page = this._getPageNoInRange(this.page);
-
-    // apply maxSize if necessary
-    if (this.maxSize > 0 && this._pageCount > this.maxSize) {
-      let start = 0;
-      let end = this._pageCount;
-
-      // either paginating or rotating page numbers
-      if (this.rotate) {
-        [start, end] = this._applyRotation();
-      } else {
-        [start, end] = this._applyPagination();
-      }
-
-      this.pages = this.pages.slice(start, end);
-
-      // adding ellipses
-      this._applyEllipses(start, end);
-    }
-  }
+  ngOnChanges(changes: SimpleChanges): void { this._updatePages(this.page); }
 
   /**
    * @internal
@@ -177,9 +142,9 @@ export class NgbPagination implements OnChanges {
         this.pages.unshift(-1);
         this.pages.unshift(1);
       }
-      if (end < this._pageCount) {
+      if (end < this.pageCount) {
         this.pages.push(-1);
-        this.pages.push(this._pageCount);
+        this.pages.push(this.pageCount);
       }
     }
   }
@@ -194,16 +159,16 @@ export class NgbPagination implements OnChanges {
    */
   private _applyRotation(): [number, number] {
     let start = 0;
-    let end = this._pageCount;
+    let end = this.pageCount;
     let leftOffset = Math.floor(this.maxSize / 2);
     let rightOffset = this.maxSize % 2 === 0 ? leftOffset - 1 : leftOffset;
 
     if (this.page <= leftOffset) {
       // very beginning, no rotation -> [0..maxSize]
       end = this.maxSize;
-    } else if (this._pageCount - this.page < leftOffset) {
+    } else if (this.pageCount - this.page < leftOffset) {
       // very end, no rotation -> [len-maxSize..len]
-      start = this._pageCount - this.maxSize;
+      start = this.pageCount - this.maxSize;
     } else {
       // rotate
       start = this.page - leftOffset - 1;
@@ -224,7 +189,47 @@ export class NgbPagination implements OnChanges {
     return [start, end];
   }
 
-  private _getPageNoInRange(newPageNo): number { return getValueInRange(newPageNo, this._pageCount, 1); }
-}
+  private _setPageInRange(newPageNo) {
+    const prevPageNo = this.page;
+    this.page = getValueInRange(newPageNo, this.pageCount, 1);
 
-export const NGB_PAGINATION_DIRECTIVES = [NgbPagination];
+    if (this.page !== prevPageNo) {
+      this.pageChange.emit(this.page);
+    }
+  }
+
+  private _updatePages(newPage: number) {
+    this.pageCount = Math.ceil(this.collectionSize / this.pageSize);
+
+    if (!isNumber(this.pageCount)) {
+      this.pageCount = 0;
+    }
+
+    // fill-in model needed to render pages
+    this.pages.length = 0;
+    for (let i = 1; i <= this.pageCount; i++) {
+      this.pages.push(i);
+    }
+
+    // set page within 1..max range
+    this._setPageInRange(newPage);
+
+    // apply maxSize if necessary
+    if (this.maxSize > 0 && this.pageCount > this.maxSize) {
+      let start = 0;
+      let end = this.pageCount;
+
+      // either paginating or rotating page numbers
+      if (this.rotate) {
+        [start, end] = this._applyRotation();
+      } else {
+        [start, end] = this._applyPagination();
+      }
+
+      this.pages = this.pages.slice(start, end);
+
+      // adding ellipses
+      this._applyEllipses(start, end);
+    }
+  }
+}

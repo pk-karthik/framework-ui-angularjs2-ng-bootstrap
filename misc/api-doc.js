@@ -10,12 +10,12 @@ function getNamesCompareFn(name) {
 
 const ANGULAR_LIFECYCLE_METHODS = [
   'ngOnInit', 'ngOnChanges', 'ngDoCheck', 'ngOnDestroy', 'ngAfterContentInit', 'ngAfterContentChecked',
-  'ngAfterViewInit', 'ngAfterViewChecked'
+  'ngAfterViewInit', 'ngAfterViewChecked', 'writeValue', 'registerOnChange', 'registerOnTouched', 'setDisabledState'
 ];
 
 function isInternalMember(member) {
   const jsDoc = ts.displayPartsToString(member.symbol.getDocumentationComment());
-  return jsDoc.indexOf('@internal') > -1;
+  return jsDoc.trim().length === 0 || jsDoc.indexOf('@internal') > -1;
 }
 
 function isAngularLifecycleHook(methodName) {
@@ -142,7 +142,7 @@ class APIDocVisitor {
           methods.push(this.visitMethodDeclaration(members[i]));
         } else if (
             members[i].kind === ts.SyntaxKind.PropertyDeclaration ||
-            members[i].kind === ts.SyntaxKind.PropertySignature) {
+            members[i].kind === ts.SyntaxKind.PropertySignature || members[i].kind === ts.SyntaxKind.GetAccessor) {
           properties.push(this.visitProperty(members[i]));
         }
       }

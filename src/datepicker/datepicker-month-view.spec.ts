@@ -13,15 +13,15 @@ const createTestComponent = (html: string) =>
     createGenericTestComponent(html, TestComponent) as ComponentFixture<TestComponent>;
 
 function getWeekdays(element: HTMLElement): HTMLElement[] {
-  return <HTMLElement[]>Array.from(element.querySelectorAll('td.weekday'));
+  return <HTMLElement[]>Array.from(element.querySelectorAll('.ngb-dp-weekday'));
 }
 
 function getWeekNumbers(element: HTMLElement): HTMLElement[] {
-  return <HTMLElement[]>Array.from(element.querySelectorAll('td.weeknumber'));
+  return <HTMLElement[]>Array.from(element.querySelectorAll('.ngb-dp-week-number'));
 }
 
 function getDates(element: HTMLElement): HTMLElement[] {
-  return <HTMLElement[]>Array.from(element.querySelectorAll('td.day'));
+  return <HTMLElement[]>Array.from(element.querySelectorAll('.ngb-dp-day'));
 }
 
 function expectWeekdays(element: HTMLElement, weekdays: string[]) {
@@ -39,16 +39,16 @@ function expectDates(element: HTMLElement, dates: string[]) {
   expect(result).toEqual(dates);
 }
 
-describe('ngbDatepickerMonthView', () => {
+describe('ngb-datepicker-month-view', () => {
 
   beforeEach(() => {
     TestBed.overrideModule(NgbDatepickerModule, {set: {exports: [NgbDatepickerMonthView, NgbDatepickerDayView]}});
-    TestBed.configureTestingModule({declarations: [TestComponent], imports: [NgbDatepickerModule]});
+    TestBed.configureTestingModule({declarations: [TestComponent], imports: [NgbDatepickerModule.forRoot()]});
   });
 
   it('should show/hide weekdays', () => {
-    const fixture =
-        createTestComponent('<tbody ngbDatepickerMonthView [month]="month" [showWeekdays]="showWeekdays"></tbody>');
+    const fixture = createTestComponent(
+        '<ngb-datepicker-month-view [month]="month" [showWeekdays]="showWeekdays"></ngb-datepicker-month-view>');
 
     expectWeekdays(fixture.nativeElement, ['Mo']);
 
@@ -59,7 +59,7 @@ describe('ngbDatepickerMonthView', () => {
 
   it('should show/hide week numbers', () => {
     const fixture = createTestComponent(
-        '<tbody ngbDatepickerMonthView [month]="month" [showWeekNumbers]="showWeekNumbers"></tbody>');
+        '<ngb-datepicker-month-view [month]="month" [showWeekNumbers]="showWeekNumbers"></ngb-datepicker-month-view>');
 
     expectWeekNumbers(fixture.nativeElement, ['2']);
 
@@ -71,15 +71,15 @@ describe('ngbDatepickerMonthView', () => {
   it('should use custom template to display dates', () => {
     const fixture = createTestComponent(`
         <template #tpl let-date="date">{{ date.day }}</template>
-        <tbody ngbDatepickerMonthView [month]="month" [dayTemplate]="tpl"></tbody>
+        <ngb-datepicker-month-view [month]="month" [dayTemplate]="tpl"></ngb-datepicker-month-view>
       `);
-    expectDates(fixture.nativeElement, ['22']);
+    expectDates(fixture.nativeElement, ['22', '23']);
   });
 
   it('should send date selection events', () => {
     const fixture = createTestComponent(`
         <template #tpl let-date="date">{{ date.day }}</template>
-        <tbody ngbDatepickerMonthView [month]="month" [dayTemplate]="tpl" (select)="onClick($event)"></tbody>
+        <ngb-datepicker-month-view [month]="month" [dayTemplate]="tpl" (select)="onClick($event)"></ngb-datepicker-month-view>
       `);
 
     spyOn(fixture.componentInstance, 'onClick');
@@ -93,7 +93,7 @@ describe('ngbDatepickerMonthView', () => {
   it('should not send date selection events for disabled dates', () => {
     const fixture = createTestComponent(`
         <template #tpl let-date="date">{{ date.day }}</template>
-        <tbody ngbDatepickerMonthView [month]="month" [dayTemplate]="tpl" (select)="onClick($event)"></tbody>
+        <ngb-datepicker-month-view [month]="month" [dayTemplate]="tpl" (select)="onClick($event)"></ngb-datepicker-month-view>
       `);
 
     fixture.componentInstance.month.weeks[0].days[0].disabled = true;
@@ -110,7 +110,8 @@ describe('ngbDatepickerMonthView', () => {
   it('should not send date selection events if disabled', () => {
     const fixture = createTestComponent(`
         <template #tpl let-date="date">{{ date.day }}</template>
-        <tbody ngbDatepickerMonthView [month]="month" [dayTemplate]="tpl" [disabled]="true" (select)="onClick($event)"></tbody>
+        <ngb-datepicker-month-view [month]="month" [dayTemplate]="tpl" [disabled]="true" (select)="onClick($event)">        
+        </ngb-datepicker-month-view>
       `);
 
     fixture.detectChanges();
@@ -127,8 +128,7 @@ describe('ngbDatepickerMonthView', () => {
     it('should set cursor to pointer', () => {
       const fixture = createTestComponent(`
         <template #tpl let-date="date">{{ date.day }}</template>
-        <table><tbody ngbDatepickerMonthView [month]="month" [dayTemplate]="tpl"
-        (change)="onClick($event)"></tbody></table>
+        <ngb-datepicker-month-view [month]="month" [dayTemplate]="tpl" (change)="onClick($event)"></ngb-datepicker-month-view>
       `);
 
       const dates = getDates(fixture.nativeElement);
@@ -137,47 +137,92 @@ describe('ngbDatepickerMonthView', () => {
   }
 
   if (!isBrowser('ie9')) {
-    it('should set not-allowed cursor for disabled dates', () => {
+    it('should set default cursor for disabled dates', () => {
       const fixture = createTestComponent(`
         <template #tpl let-date="date">{{ date.day }}</template>
-        <table><tbody ngbDatepickerMonthView [month]="month" [dayTemplate]="tpl"
-        (change)="onClick($event)"></tbody></table>
+        <ngb-datepicker-month-view [month]="month" [dayTemplate]="tpl" (change)="onClick($event)"></ngb-datepicker-month-view>
       `);
 
       fixture.componentInstance.month.weeks[0].days[0].disabled = true;
       fixture.detectChanges();
 
       const dates = getDates(fixture.nativeElement);
-      expect(window.getComputedStyle(dates[0]).getPropertyValue('cursor')).toBe('not-allowed');
+      expect(window.getComputedStyle(dates[0]).getPropertyValue('cursor')).toBe('default');
     });
 
-    it('should set not-allowed cursor for all dates if disabled', () => {
+    it('should set default cursor for all dates if disabled', () => {
       const fixture = createTestComponent(`
         <template #tpl let-date="date">{{ date.day }}</template>
-        <table><tbody ngbDatepickerMonthView [month]="month" [dayTemplate]="tpl"
-        (change)="onClick($event)" [disabled]="true"></tbody></table>
+        <ngb-datepicker-month-view [month]="month" [dayTemplate]="tpl" (change)="onClick($event)" [disabled]="true">        
+        </ngb-datepicker-month-view>
       `);
 
       fixture.detectChanges();
 
       const dates = getDates(fixture.nativeElement);
-      dates.forEach((date) => expect(window.getComputedStyle(date).getPropertyValue('cursor')).toBe('not-allowed'));
+      dates.forEach((date) => expect(window.getComputedStyle(date).getPropertyValue('cursor')).toBe('default'));
+    });
+
+    it('should set default cursor for other months days', () => {
+      const fixture = createTestComponent(
+          '<ngb-datepicker-month-view [month]="month" [outsideDays]="outsideDays"></ngb-datepicker-month-view>');
+
+      const dates = getDates(fixture.nativeElement);
+      expect(window.getComputedStyle(dates[1]).getPropertyValue('cursor')).toBe('pointer');
+
+      fixture.componentInstance.outsideDays = 'collapsed';
+      fixture.detectChanges();
+      expect(window.getComputedStyle(dates[1]).getPropertyValue('cursor')).toBe('default');
+
+      fixture.componentInstance.outsideDays = 'hidden';
+      fixture.detectChanges();
+      expect(window.getComputedStyle(dates[1]).getPropertyValue('cursor')).toBe('default');
     });
   }
+
+  it('should apply proper visibility to other months days', () => {
+    const fixture = createTestComponent(
+        '<ngb-datepicker-month-view [month]="month" [outsideDays]="outsideDays"></ngb-datepicker-month-view>');
+
+    let dates = getDates(fixture.nativeElement);
+    expect(dates[0]).not.toHaveCssClass('hidden');
+    expect(dates[0]).not.toHaveCssClass('collapsed');
+    expect(dates[1]).not.toHaveCssClass('hidden');
+    expect(dates[1]).not.toHaveCssClass('collapsed');
+
+    fixture.componentInstance.outsideDays = 'collapsed';
+    fixture.detectChanges();
+    expect(dates[0]).not.toHaveCssClass('hidden');
+    expect(dates[0]).not.toHaveCssClass('collapsed');
+    expect(dates[1]).not.toHaveCssClass('hidden');
+    expect(dates[1]).toHaveCssClass('collapsed');
+
+    fixture.componentInstance.outsideDays = 'hidden';
+    fixture.detectChanges();
+    expect(dates[0]).not.toHaveCssClass('hidden');
+    expect(dates[0]).not.toHaveCssClass('collapsed');
+    expect(dates[1]).toHaveCssClass('hidden');
+    expect(dates[1]).not.toHaveCssClass('collapsed');
+  });
 
 });
 
 @Component({selector: 'test-cmp', template: ''})
 class TestComponent {
   month: MonthViewModel = {
+    firstDate: new NgbDate(2016, 7, 22),
     year: 2016,
     number: 7,
     weekdays: [1],
-    weeks: [{number: 2, days: [{date: new NgbDate(2016, 7, 22), disabled: false}]}]
+    weeks: [{
+      number: 2,
+      days: [{date: new NgbDate(2016, 7, 22), disabled: false}, {date: new NgbDate(2016, 8, 23), disabled: false}]
+    }]
   };
 
   showWeekdays = true;
   showWeekNumbers = true;
+  outsideDays = 'visible';
 
   onClick = () => {};
 }

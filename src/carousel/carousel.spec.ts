@@ -30,7 +30,9 @@ function expectActiveSlides(nativeEl: HTMLDivElement, active: boolean[]) {
 }
 
 describe('ngb-carousel', () => {
-  beforeEach(() => { TestBed.configureTestingModule({declarations: [TestComponent], imports: [NgbCarouselModule]}); });
+  beforeEach(() => {
+    TestBed.configureTestingModule({declarations: [TestComponent], imports: [NgbCarouselModule.forRoot()]});
+  });
 
   it('should initialize inputs with default values', () => {
     const defaultConfig = new NgbCarouselConfig();
@@ -139,15 +141,16 @@ describe('ngb-carousel', () => {
 
        const fixture = createTestComponent(html);
 
-       const controlElms = fixture.nativeElement.querySelectorAll('.carousel-control');
+       const prevControlElm = fixture.nativeElement.querySelector('.carousel-control-prev');
+       const nextControlElm = fixture.nativeElement.querySelector('.carousel-control-next');
 
        expectActiveSlides(fixture.nativeElement, [true, false]);
 
-       controlElms[1].click();  // next
+       nextControlElm.click();  // next
        fixture.detectChanges();
        expectActiveSlides(fixture.nativeElement, [false, true]);
 
-       controlElms[0].click();  // prev
+       prevControlElm.click();  // prev
        fixture.detectChanges();
        expectActiveSlides(fixture.nativeElement, [true, false]);
 
@@ -196,6 +199,29 @@ describe('ngb-carousel', () => {
        discardPeriodicTasks();
      }));
 
+  it('should not change slide on time passage (custom interval value is zero)', fakeAsync(() => {
+       const html = `
+      <ngb-carousel [interval]="0">
+        <template ngbSlide>foo</template>
+        <template ngbSlide>bar</template>
+      </ngb-carousel>
+    `;
+
+       const fixture = createTestComponent(html);
+
+       expectActiveSlides(fixture.nativeElement, [true, false]);
+
+       tick(1000);
+       fixture.detectChanges();
+       expectActiveSlides(fixture.nativeElement, [true, false]);
+
+       tick(1200);
+       fixture.detectChanges();
+       expectActiveSlides(fixture.nativeElement, [true, false]);
+
+       discardPeriodicTasks();
+     }));
+
   it('should pause / resume slide change with time passage on mouse enter / leave', fakeAsync(() => {
        const html = `
       <ngb-carousel>
@@ -239,19 +265,20 @@ describe('ngb-carousel', () => {
 
        const fixture = createTestComponent(html);
 
-       const controlElms = fixture.nativeElement.querySelectorAll('.carousel-control');
+       const prevControlElm = fixture.nativeElement.querySelector('.carousel-control-prev');
+       const nextControlElm = fixture.nativeElement.querySelector('.carousel-control-next');
 
        expectActiveSlides(fixture.nativeElement, [true, false]);
 
-       controlElms[1].click();  // next
+       nextControlElm.click();  // next
        fixture.detectChanges();
        expectActiveSlides(fixture.nativeElement, [false, true]);
 
-       controlElms[1].click();  // next
+       nextControlElm.click();  // next
        fixture.detectChanges();
        expectActiveSlides(fixture.nativeElement, [true, false]);
 
-       controlElms[0].click();  // prev
+       prevControlElm.click();  // prev
        fixture.detectChanges();
        expectActiveSlides(fixture.nativeElement, [false, true]);
 
@@ -268,19 +295,20 @@ describe('ngb-carousel', () => {
 
        const fixture = createTestComponent(html);
 
-       const controlElms = fixture.nativeElement.querySelectorAll('.carousel-control');
+       const prevControlElm = fixture.nativeElement.querySelector('.carousel-control-prev');
+       const nextControlElm = fixture.nativeElement.querySelector('.carousel-control-next');
 
        expectActiveSlides(fixture.nativeElement, [true, false]);
 
-       controlElms[0].click();  // prev
+       prevControlElm.click();  // prev
        fixture.detectChanges();
        expectActiveSlides(fixture.nativeElement, [true, false]);
 
-       controlElms[1].click();  // next
+       nextControlElm.click();  // next
        fixture.detectChanges();
        expectActiveSlides(fixture.nativeElement, [false, true]);
 
-       controlElms[1].click();  // next
+       nextControlElm.click();  // next
        fixture.detectChanges();
        expectActiveSlides(fixture.nativeElement, [false, true]);
 
@@ -298,17 +326,17 @@ describe('ngb-carousel', () => {
        const fixture = createTestComponent(html);
        expectActiveSlides(fixture.nativeElement, [true, false]);
 
-       fixture.debugElement.query(By.directive(NgbCarousel)).triggerEventHandler('keyup.arrowRight', {});  // next()
+       fixture.debugElement.query(By.directive(NgbCarousel)).triggerEventHandler('keydown.arrowRight', {});  // next()
        fixture.detectChanges();
        expectActiveSlides(fixture.nativeElement, [false, true]);
 
-       fixture.debugElement.query(By.directive(NgbCarousel)).triggerEventHandler('keyup.arrowLeft', {});  // prev()
+       fixture.debugElement.query(By.directive(NgbCarousel)).triggerEventHandler('keydown.arrowLeft', {});  // prev()
        fixture.detectChanges();
        expectActiveSlides(fixture.nativeElement, [true, false]);
 
        fixture.componentInstance.keyboard = false;
        fixture.detectChanges();
-       fixture.debugElement.query(By.directive(NgbCarousel)).triggerEventHandler('keyup.arrowRight', {});  // prev()
+       fixture.debugElement.query(By.directive(NgbCarousel)).triggerEventHandler('keydown.arrowRight', {});  // prev()
        fixture.detectChanges();
        expectActiveSlides(fixture.nativeElement, [true, false]);
 
@@ -330,13 +358,13 @@ describe('ngb-carousel', () => {
 
        fixture.componentInstance.keyboard = false;
        fixture.detectChanges();
-       fixture.debugElement.query(By.directive(NgbCarousel)).triggerEventHandler('keyup.arrowRight', {});  // prev()
+       fixture.debugElement.query(By.directive(NgbCarousel)).triggerEventHandler('keydown.arrowRight', {});  // prev()
        fixture.detectChanges();
        expectActiveSlides(fixture.nativeElement, [true, false]);
 
        fixture.componentInstance.keyboard = true;
        fixture.detectChanges();
-       fixture.debugElement.query(By.directive(NgbCarousel)).triggerEventHandler('keyup.arrowRight', {});  // next()
+       fixture.debugElement.query(By.directive(NgbCarousel)).triggerEventHandler('keydown.arrowRight', {});  // next()
        fixture.detectChanges();
        expectActiveSlides(fixture.nativeElement, [false, true]);
 
@@ -347,7 +375,7 @@ describe('ngb-carousel', () => {
   describe('Custom config', () => {
     let config: NgbCarouselConfig;
 
-    beforeEach(() => { TestBed.configureTestingModule({imports: [NgbCarouselModule]}); });
+    beforeEach(() => { TestBed.configureTestingModule({imports: [NgbCarouselModule.forRoot()]}); });
 
     beforeEach(inject([NgbCarouselConfig], (c: NgbCarouselConfig) => {
       config = c;
@@ -375,7 +403,7 @@ describe('ngb-carousel', () => {
 
     beforeEach(() => {
       TestBed.configureTestingModule(
-          {imports: [NgbCarouselModule], providers: [{provide: NgbCarouselConfig, useValue: config}]});
+          {imports: [NgbCarouselModule.forRoot()], providers: [{provide: NgbCarouselConfig, useValue: config}]});
     });
 
     it('should initialize inputs with provided config as provider', () => {

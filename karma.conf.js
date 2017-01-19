@@ -9,7 +9,6 @@ module.exports = function(config) {
       // For travis
       'node_modules/core-js/client/shim.js',
       'node_modules/ie-shim/index.js',
-      'node_modules/reflect-metadata/Reflect.js',
       // paths loaded by Karma
       'node_modules/systemjs/dist/system-polyfills.js',
       'node_modules/systemjs/dist/system.src.js',
@@ -34,24 +33,21 @@ module.exports = function(config) {
       {pattern: 'temp/**/*.js.map', included: false, watched: false}
     ],
 
-    preprocessors: {'temp/**/*.js': ['sourcemap']},
+    preprocessors: {
+      'temp/**/*.js': 'sourcemap',
+      'temp/**/!(*.spec|*.module).js': 'coverage'
+    },
 
     customLaunchers: {
       'SL_CHROME': {
         base: 'SauceLabs',
         browserName: 'chrome',
-        version: '52'
+        version: 'latest'
       },
       'SL_FIREFOX': {
         base: 'SauceLabs',
         browserName: 'firefox',
-        version: '46'
-      },
-      'SL_IE9': {
-        base: 'SauceLabs',
-        browserName: 'internet explorer',
-        platform: 'Windows 2008',
-        version: '9'
+        version: 'latest'
       },
       'SL_IE10': {
         base: 'SauceLabs',
@@ -65,17 +61,29 @@ module.exports = function(config) {
         platform: 'Windows 8.1',
         version: '11'
       },
-      'SL_EDGE': {
+      'SL_EDGE13': {
         base: 'SauceLabs',
         browserName: 'MicrosoftEdge',
         platform: 'Windows 10',
         version: '13.10586'
+      },
+      'SL_EDGE14': {
+        base: 'SauceLabs',
+        browserName: 'MicrosoftEdge',
+        platform: 'Windows 10',
+        version: '14.14393'
       },
       'SL_SAFARI9': {
         base: 'SauceLabs',
         browserName: 'safari',
         platform: 'OS X 10.11',
         version: '9.0'
+      },
+      'SL_SAFARI10': {
+        base: 'SauceLabs',
+        browserName: 'safari',
+        platform: 'OS X 10.11',
+        version: '10.0'
       }
     },
 
@@ -86,14 +94,24 @@ module.exports = function(config) {
       recordVideo: false,
       recordScreenshots: false,
       options: {
-        'selenium-version': '2.53.0',
         'command-timeout': 600,
         'idle-timeout': 600,
         'max-duration': 5400
       }
     },
 
-    reporters: ['progress'],
+    reporters: ['progress', 'coverage'],
+
+    coverageReporter: {
+      dir: 'coverage/',
+      reporters: [{
+        type: 'json',
+        dir: 'coverage',
+        subdir: 'json',
+        file: 'coverage-final.json'
+      }]
+    },
+
     port: 9876,
     colors: true,
     logLevel: config.LOG_INFO,

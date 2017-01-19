@@ -3,6 +3,7 @@ import {TestBed} from '@angular/core/testing';
 import {Component} from '@angular/core';
 import {NgbDatepickerModule} from './datepicker.module';
 import {NgbDatepickerDayView} from './datepicker-day-view';
+import {NgbDateStruct} from './ngb-date-struct';
 
 function getElement(element: HTMLElement): HTMLElement {
   return <HTMLElement>element.querySelector('[ngbDatepickerDayView]');
@@ -12,7 +13,7 @@ describe('ngbDatepickerDayView', () => {
 
   beforeEach(() => {
     TestBed.overrideModule(NgbDatepickerModule, {set: {exports: [NgbDatepickerDayView]}});
-    TestBed.configureTestingModule({declarations: [TestComponent], imports: [NgbDatepickerModule]});
+    TestBed.configureTestingModule({declarations: [TestComponent], imports: [NgbDatepickerModule.forRoot()]});
   });
 
   it('should display date', () => {
@@ -39,16 +40,18 @@ describe('ngbDatepickerDayView', () => {
     expect(el).toHaveCssClass('text-muted');
   });
 
-  it('should apply text-muted style for days of a different month', () => {
+  it('should apply text-muted and outside classes for days of a different month', () => {
     const fixture = TestBed.createComponent(TestComponent);
     fixture.detectChanges();
 
     const el = getElement(fixture.nativeElement);
     expect(el).not.toHaveCssClass('text-muted');
+    expect(el).not.toHaveCssClass('outside');
 
     fixture.componentInstance.date = {year: 2016, month: 8, day: 22};
     fixture.detectChanges();
     expect(el).toHaveCssClass('text-muted');
+    expect(el).toHaveCssClass('outside');
   });
 
   it('should apply selected style', () => {
@@ -56,10 +59,12 @@ describe('ngbDatepickerDayView', () => {
     fixture.detectChanges();
 
     const el = getElement(fixture.nativeElement);
+    expect(el).not.toHaveCssClass('text-white');
     expect(el).not.toHaveCssClass('bg-primary');
 
     fixture.componentInstance.selected = true;
     fixture.detectChanges();
+    expect(el).toHaveCssClass('text-white');
     expect(el).toHaveCssClass('bg-primary');
   });
 
@@ -82,7 +87,7 @@ describe('ngbDatepickerDayView', () => {
 })
 class TestComponent {
   currentMonth = 7;
-  date = {year: 2016, month: 7, day: 22};
+  date: NgbDateStruct = {year: 2016, month: 7, day: 22};
   disabled = false;
   selected = false;
 }

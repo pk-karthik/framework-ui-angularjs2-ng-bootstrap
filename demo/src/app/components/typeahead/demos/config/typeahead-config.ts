@@ -1,5 +1,5 @@
 import {Component} from '@angular/core';
-import {Observable} from 'rxjs/Rx';
+import {Observable} from 'rxjs/Observable';
 import {NgbTypeaheadConfig} from '@ng-bootstrap/ng-bootstrap';
 import 'rxjs/add/operator/map';
 import 'rxjs/add/operator/debounceTime';
@@ -21,6 +21,7 @@ const states = ['Alabama', 'Alaska', 'American Samoa', 'Arizona', 'Arkansas', 'C
   providers: [NgbTypeaheadConfig] // add NgbTypeaheadConfig to the component providers
 })
 export class NgbdTypeaheadConfig {
+  public model: any;
 
   constructor(config: NgbTypeaheadConfig) {
     // customize default values of typeaheads used by this component tree

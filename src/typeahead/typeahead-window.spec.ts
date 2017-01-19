@@ -14,7 +14,7 @@ describe('ngb-typeahead-window', () => {
 
   beforeEach(() => {
     TestBed.overrideModule(NgbTypeaheadModule, {set: {exports: [NgbTypeaheadWindow]}});
-    TestBed.configureTestingModule({declarations: [TestComponent], imports: [NgbTypeaheadModule]});
+    TestBed.configureTestingModule({declarations: [TestComponent], imports: [NgbTypeaheadModule.forRoot()]});
   });
 
   describe('display', () => {
@@ -80,6 +80,41 @@ describe('ngb-typeahead-window', () => {
       buttons[0].click();
       fixture.detectChanges();
       expectResults(fixture.nativeElement, ['+bar', 'baz']);
+    });
+
+    it('should wrap active row on prev / next method call for [focusFirst]="false"', () => {
+      const html = `
+           <button (click)="w.next()">+</button>
+           <button (click)="w.prev()">-</button>
+           <ngb-typeahead-window [results]="results" [term]="term" #w="ngbTypeaheadWindow" [focusFirst]="false"></ngb-typeahead-window>`;
+      const fixture = createTestComponent(html);
+      const buttons = fixture.nativeElement.querySelectorAll('button');
+
+      expectResults(fixture.nativeElement, ['bar', 'baz']);
+
+      buttons[0].click();  // next
+      fixture.detectChanges();
+      expectResults(fixture.nativeElement, ['+bar', 'baz']);
+
+      buttons[0].click();  // next
+      fixture.detectChanges();
+      expectResults(fixture.nativeElement, ['bar', '+baz']);
+
+      buttons[0].click();  // next
+      fixture.detectChanges();
+      expectResults(fixture.nativeElement, ['bar', 'baz']);
+
+      buttons[1].click();  // prev
+      fixture.detectChanges();
+      expectResults(fixture.nativeElement, ['bar', '+baz']);
+
+      buttons[1].click();  // prev
+      fixture.detectChanges();
+      expectResults(fixture.nativeElement, ['+bar', 'baz']);
+
+      buttons[1].click();  // prev
+      fixture.detectChanges();
+      expectResults(fixture.nativeElement, ['bar', 'baz']);
     });
 
     it('should change active row on mouseenter', () => {

@@ -1,5 +1,45 @@
-import {Component, ChangeDetectionStrategy, Input, Output, EventEmitter, OnInit} from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  Input,
+  Output,
+  EventEmitter,
+  OnInit,
+  TemplateRef,
+  OnChanges,
+  SimpleChanges,
+  ContentChild,
+  forwardRef,
+  ChangeDetectorRef
+} from '@angular/core';
 import {NgbRatingConfig} from './rating-config';
+import {toString, getValueInRange} from '../util/util';
+import {ControlValueAccessor, NG_VALUE_ACCESSOR} from '@angular/forms';
+
+enum Key {
+  End = 35,
+  Home = 36,
+  ArrowLeft = 37,
+  ArrowUp = 38,
+  ArrowRight = 39,
+  ArrowDown = 40
+}
+
+/**
+ * Context for the custom star display template
+ */
+export interface StarTemplateContext {
+  /**
+   * Star fill percentage. An integer value between 0 and 100
+   */
+  fill: number;
+}
+
+const NGB_RATING_VALUE_ACCESSOR = {
+  provide: NG_VALUE_ACCESSOR,
+  useExisting: forwardRef(() => NgbRating),
+  multi: true
+};
 
 /**
  * Rating directive that will take care of visualising a star rating bar.
@@ -7,18 +47,24 @@ import {NgbRatingConfig} from './rating-config';
 @Component({
   selector: 'ngb-rating',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {'(keydown)': 'handleKeyDown($event)'},
   template: `
-    <span tabindex="0" (mouseleave)="reset()" aria-valuemin="0" [attr.aria-valuemax]="max" [attr.aria-valuenow]="rate">
-      <template ngFor let-r [ngForOf]="range" let-index="index">
+    <template #t let-fill="fill">{{ fill === 100 ? '&#9733;' : '&#9734;' }}</template>
+    <span tabindex="0" (mouseleave)="reset()" role="slider" aria-valuemin="0"
+      [attr.aria-valuemax]="max" [attr.aria-valuenow]="rate" [attr.aria-valuetext]="ariaValueText()">
+      <template ngFor [ngForOf]="range" let-index="index">
         <span class="sr-only">({{ index < rate ? '*' : ' ' }})</span>
-        <span (mouseenter)="enter(index + 1)" (click)="update(index + 1)" [title]="r.title" 
-        [attr.aria-valuetext]="r.title" 
-        [style.cursor]="readonly ? 'not-allowed' : 'pointer'">{{ index < rate ? '&#9733;' : '&#9734;' }}</span>
+        <span (mouseenter)="enter(index + 1)" (click)="update(index + 1)" 
+        [style.cursor]="readonly ? 'default' : 'pointer'">
+          <template [ngTemplateOutlet]="starTemplate || t" [ngOutletContext]="{fill: getFillValue(index)}"></template>
+        </span>
       </template>
     </span>
-  `
+  `,
+  providers: [NGB_RATING_VALUE_ACCESSOR]
 })
-export class NgbRating implements OnInit {
+export class NgbRating implements ControlValueAccessor,
+    OnInit, OnChanges {
   private _oldRate: number;
   range: number[] = [];
 
@@ -28,7 +74,7 @@ export class NgbRating implements OnInit {
   @Input() max: number;
 
   /**
-   * Current rating.
+   * Current rating. Can be a decimal value like 3.75
    */
   @Input() rate: number;
 
@@ -36,6 +82,12 @@ export class NgbRating implements OnInit {
    * A flag indicating if rating can be updated.
    */
   @Input() readonly: boolean;
+
+  /**
+   * A template to override star display.
+   * Alternatively put a <template> as the only child of <ngb-rating> element
+   */
+  @Input() @ContentChild(TemplateRef) starTemplate: TemplateRef<StarTemplateContext>;
 
   /**
    * An event fired when a user is hovering over a given rating.
@@ -53,12 +105,17 @@ export class NgbRating implements OnInit {
    * An event fired when a user selects a new rating.
    * Event's payload equals to the newly selected rating.
    */
-  @Output() rateChange = new EventEmitter<number>();
+  @Output() rateChange = new EventEmitter<number>(true);
 
-  constructor(config: NgbRatingConfig) {
+  onChange = (_: any) => {};
+  onTouched = () => {};
+
+  constructor(config: NgbRatingConfig, private _changeDetectorRef: ChangeDetectorRef) {
     this.max = config.max;
     this.readonly = config.readonly;
   }
+
+  ariaValueText() { return `${this.rate} out of ${this.max}`; }
 
   enter(value: number): void {
     if (!this.readonly) {
@@ -67,31 +124,76 @@ export class NgbRating implements OnInit {
     this.hover.emit(value);
   }
 
-  ngOnInit(): void {
-    this._oldRate = this.rate;
-    this.range = this._buildTemplateObjects();
+  handleKeyDown(event: KeyboardEvent) {
+    if (Key[toString(event.which)]) {
+      event.preventDefault();
+
+      switch (event.which) {
+        case Key.ArrowDown:
+        case Key.ArrowLeft:
+          this.update(this.rate - 1);
+          break;
+        case Key.ArrowUp:
+        case Key.ArrowRight:
+          this.update(this.rate + 1);
+          break;
+        case Key.Home:
+          this.update(0);
+          break;
+        case Key.End:
+          this.update(this.max);
+          break;
+      }
+    }
   }
+
+  getFillValue(index: number): number {
+    const diff = this.rate - index;
+
+    if (diff >= 1) {
+      return 100;
+    }
+    if (diff < 1 && diff > 0) {
+      return Number.parseInt((diff * 100).toFixed(2));
+    }
+
+    return 0;
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['rate']) {
+      this.update(this.rate);
+      this._oldRate = this.rate;
+    }
+  }
+
+  ngOnInit(): void { this.range = Array.from({length: this.max}, (v, k) => k + 1); }
+
+  registerOnChange(fn: (value: any) => any): void { this.onChange = fn; }
+
+  registerOnTouched(fn: () => any): void { this.onTouched = fn; }
 
   reset(): void {
     this.leave.emit(this.rate);
     this.rate = this._oldRate;
   }
 
-  update(value: number): void {
+  update(value: number, internalChange = true): void {
     if (!this.readonly) {
-      this._oldRate = value;
-      this.rate = value;
-      this.rateChange.emit(value);
+      const newRate = value ? getValueInRange(value, this.max, 0) : 0;
+      if (this._oldRate !== newRate) {
+        this._oldRate = newRate;
+        this.rate = newRate;
+        this.rateChange.emit(newRate);
+        if (internalChange) {
+          this.onChange(this.rate);
+        }
+      }
     }
   }
 
-  private _buildTemplateObjects(): number[] {
-    let range = [];
-    for (let i = 1; i <= this.max; i++) {
-      range.push({title: i});
-    }
-    return range;
+  writeValue(value) {
+    this.update(value, false);
+    this._changeDetectorRef.markForCheck();
   }
 }
-
-export const NGB_RATING_DIRECTIVES = [NgbRating];

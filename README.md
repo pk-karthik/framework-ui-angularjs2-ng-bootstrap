@@ -3,8 +3,6 @@
 [![npm version](https://badge.fury.io/js/%40ng-bootstrap%2Fng-bootstrap.svg)](https://badge.fury.io/js/%40ng-bootstrap%2Fng-bootstrap)
 [![Build Status](https://travis-ci.org/ng-bootstrap/ng-bootstrap.svg?branch=master)](https://travis-ci.org/ng-bootstrap/ng-bootstrap)
 [![devDependency Status](https://david-dm.org/ng-bootstrap/ng-bootstrap/dev-status.svg?branch=master)](https://david-dm.org/ng-bootstrap/ng-bootstrap#info=devDependencies)
-[![Issue Stats](http://issuestats.com/github/ng-bootstrap/ng-bootstrap/badge/pr)](http://issuestats.com/github/ng-bootstrap/ng-bootstrap)
-[![Issue Stats](http://issuestats.com/github/ng-bootstrap/ng-bootstrap/badge/issue)](http://issuestats.com/github/ng-bootstrap/ng-bootstrap)
 [![Sauce Test Status](https://saucelabs.com/browser-matrix/pkozlowski.svg)](https://saucelabs.com/u/pkozlowski)
 
 Welcome to the Angular 2 version of the [Angular UI Bootstrap](https://github.com/angular-ui/bootstrap) library.
@@ -17,34 +15,57 @@ Feel free to make comments there.
 
 ## Demo
 
-Check all the directives in action at https://ng-bootstrap.github.io
+View all the directives in action at https://ng-bootstrap.github.io
 
 ## Dependencies
-* [Angular 2](https://angular.io) (tested with 2.0.0-rc.7)
-* [Bootstrap 4](https://v4-alpha.getbootstrap.com) (tested with 4.0.0-alpha.4)
+* [Angular 2](https://angular.io) (tested with 2.0.0)
+* [Bootstrap 4](https://v4-alpha.getbootstrap.com) (tested with 4.0.0-alpha.6)
 
 ## Installation
 After installing the above dependencies, install `ng-bootstrap` via:
-```
+```shell
 npm install --save @ng-bootstrap/ng-bootstrap
 ```
 Once installed you need to import our main module:
-```
+```js
 import {NgbModule} from '@ng-bootstrap/ng-bootstrap';
 ```
-The only remaining part is to list the imported module in your application module. You should end up with the code similar to:
-```
+The only remaining part is to list the imported module in your application module. The exact method will be slightly
+different for the root (top-level) module for which you should end up with the code similar to (notice `NgbModule.forRoot()`):
+```js
 import {NgbModule} from '@ng-bootstrap/ng-bootstrap';
 
 @NgModule({
   declarations: [AppComponent, ...],
-  imports: [NgbModule, ...],  
+  imports: [NgbModule.forRoot(), ...],  
   bootstrap: [AppComponent]
 })
 export class AppModule {
 }
 ```
 
+Other modules in your application can simply import `NgbModule`:
+
+```js
+import {NgbModule} from '@ng-bootstrap/ng-bootstrap';
+
+@NgModule({
+  declarations: [OtherComponent, ...],
+  imports: [NgbModule, ...], 
+})
+export class OtherModule {
+}
+```
+
+### SystemJS
+If you are using SystemJS, you should also adjust your configuration to point to the UMD bundle.
+
+In your systemjs config file, `map` needs to tell the System loader where to look for `ng-bootstrap`:
+```js
+map: {
+  '@ng-bootstrap/ng-bootstrap': 'node_modules/@ng-bootstrap/ng-bootstrap/bundles/ng-bootstrap.js',
+}
+```
 ## Supported browsers
 
 We support the same browsers and versions supported by both Bootstrap 4 and Angular 2, whichever is _more_ restrictive.
@@ -52,13 +73,15 @@ See [this](https://github.com/angular/angular/blob/master/README.md) for up-to-d
 
 * Chrome (45+)
 * Firefox (40+)
-* IE (9+) (but see [Bootstrap 4's notes](http://v4-alpha.getbootstrap.com/getting-started/browsers-devices/#internet-explorer-9) on IE9)
+* IE (10+) 
 * Edge (20+)
 * Safari (7+)
 
+Also check [Bootstrap 4's notes](http://v4-alpha.getbootstrap.com/getting-started/browsers-devices/#internet-explorer-9) on browsers support.
+
 ## Contributing to the project
 
-We are always looking for the quality contributions! Please check the [CONTRIBUTING.md](CONTRIBUTING.md) doc for contribution guidelines.
+Please check the [CONTRIBUTING.md](CONTRIBUTING.md) doc for contribution guidelines.
 
 ## Getting Help
 
@@ -74,12 +97,13 @@ To save your and our time we will be systematically closing all the issues that 
 ## You think you've found a bug?
 
 Oh, we are ashamed and want to fix it ASAP! But before fixing a bug we need to reproduce and confirm it. In order to reproduce bugs we will systematically ask you to provide a _minimal_ reproduction scenario using http://plnkr.co. Having a live, reproducible scenario gives us wealth of important information without going back & forth to you with additional questions like:
-* version of AngularJS used
+* version of Angular used
 * version of this library that you are using
 * 3rd-party libraries used, if any
 * and most importantly - a use-case that fails
 
 A minimal reproduce scenario using http://plnkr.co/ allows us to quickly confirm a bug (or point out coding problem) as well as confirm that we are fixing the right problem.
+The best part is that you do not need to create plunks from scratch - you can fork one from our [demo page](https://ng-bootstrap.github.io/#/components).
 
 We will be insisting on a minimal reproduce scenario in order to save maintainers time and ultimately be able to fix more bugs. Interestingly, from our experience users often find coding problems themselves while preparing a minimal plunk. We understand that sometimes it might be hard to extract essentials bits of code from a larger code-base but we really need to isolate the problem before we can fix it.
 

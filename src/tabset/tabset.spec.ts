@@ -52,7 +52,8 @@ function getButton(nativeEl: HTMLElement) {
 }
 
 describe('ngb-tabset', () => {
-  beforeEach(() => { TestBed.configureTestingModule({declarations: [TestComponent], imports: [NgbTabsetModule]}); });
+  beforeEach(
+      () => { TestBed.configureTestingModule({declarations: [TestComponent], imports: [NgbTabsetModule.forRoot()]}); });
 
   it('should initialize inputs with default values', () => {
     const defaultConfig = new NgbTabsetConfig();
@@ -77,6 +78,23 @@ describe('ngb-tabset', () => {
     expect(tabContent[0].textContent).toMatch(/Foo/);
 
     expectTabs(fixture.nativeElement, [true, false]);
+  });
+
+  it('should have aria attributes', () => {
+    const fixture = createTestComponent(`
+      <ngb-tabset>
+        <ngb-tab title="foo"><template ngbTabContent>Foo</template></ngb-tab>
+        <ngb-tab title="bar"><template ngbTabContent>Bar</template></ngb-tab>
+      </ngb-tabset>
+    `);
+
+    const tabTitles = getTabTitles(fixture.nativeElement);
+    const tabContent = getTabContent(fixture.nativeElement);
+
+    expect(tabTitles[0].getAttribute('role')).toBe('tab');
+    expect(tabTitles[0].getAttribute('aria-expanded')).toBe('true');
+    expect(tabTitles[1].getAttribute('aria-expanded')).toBe('false');
+    expect(tabTitles[0].getAttribute('aria-controls')).toBe(tabContent[0].getAttribute('id'));
   });
 
   it('should allow mix of text and HTML in tab titles', () => {
@@ -227,6 +245,36 @@ describe('ngb-tabset', () => {
     expect(fixture.nativeElement.querySelector('ul')).not.toHaveCssClass('nav-tabs');
   });
 
+  it('should have the nav left-aligned by default', () => {
+    const fixture = createTestComponent(`
+         <ngb-tabset>
+           <ngb-tab title="bar"><template ngbTabContent>Bar</template></ngb-tab>
+         </ngb-tabset>
+       `);
+
+    expect(fixture.nativeElement.querySelector('ul')).toHaveCssClass('justify-content-start');
+  });
+
+  it('should have the nav center-aligned upon setting justify center', () => {
+    const fixture = createTestComponent(`
+         <ngb-tabset justify="center">
+           <ngb-tab title="bar"><template ngbTabContent>Bar</template></ngb-tab>
+         </ngb-tabset>
+       `);
+
+    expect(fixture.nativeElement.querySelector('ul')).toHaveCssClass('justify-content-center');
+  });
+
+  it('should have the nav right-aligned upon setting justify end', () => {
+    const fixture = createTestComponent(`
+         <ngb-tabset justify="end">
+           <ngb-tab title="bar"><template ngbTabContent>Bar</template></ngb-tab>
+         </ngb-tabset>
+       `);
+
+    expect(fixture.nativeElement.querySelector('ul')).toHaveCssClass('justify-content-end');
+  });
+
 
   it('should change active tab by calling select on an exported directive instance', () => {
     const fixture = createTestComponent(`
@@ -272,7 +320,7 @@ describe('ngb-tabset', () => {
 
   it('should emit tab change event when switching tabs', () => {
     const fixture = createTestComponent(`
-          <ngb-tabset #myTabSet="ngbTabset" (change)="changeCallback($event)">
+          <ngb-tabset #myTabSet="ngbTabset" (tabChange)="changeCallback($event)">
             <ngb-tab id="first" title="first"><template ngbTabContent>First</template></ngb-tab>
             <ngb-tab id="second" title="second"><template ngbTabContent>Second</template></ngb-tab>
           </ngb-tabset>
@@ -299,7 +347,7 @@ describe('ngb-tabset', () => {
 
   it('should not emit tab change event when selecting currently active and disabled tabs', () => {
     const fixture = createTestComponent(`
-          <ngb-tabset #myTabSet="ngbTabset" (change)="changeCallback($event)">
+          <ngb-tabset #myTabSet="ngbTabset" (tabChange)="changeCallback($event)">
             <ngb-tab id="first" title="first"><template ngbTabContent>First</template></ngb-tab>
             <ngb-tab id="second" title="second" [disabled]="true"><template ngbTabContent>Second</template></ngb-tab>
           </ngb-tabset>
@@ -324,7 +372,7 @@ describe('ngb-tabset', () => {
 
   it('should cancel tab change when preventDefault() is called', () => {
     const fixture = createTestComponent(`
-          <ngb-tabset #myTabSet="ngbTabset" (change)="changeCallback($event)">
+          <ngb-tabset #myTabSet="ngbTabset" (tabChange)="changeCallback($event)">
             <ngb-tab id="first" title="first"><template ngbTabContent>First</template></ngb-tab>
             <ngb-tab id="second" title="second"><template ngbTabContent>Second</template></ngb-tab>
           </ngb-tabset>
@@ -350,7 +398,7 @@ describe('ngb-tabset', () => {
   describe('Custom config', () => {
     let config: NgbTabsetConfig;
 
-    beforeEach(() => { TestBed.configureTestingModule({imports: [NgbTabsetModule]}); });
+    beforeEach(() => { TestBed.configureTestingModule({imports: [NgbTabsetModule.forRoot()]}); });
 
     beforeEach(inject([NgbTabsetConfig], (c: NgbTabsetConfig) => {
       config = c;
@@ -372,7 +420,7 @@ describe('ngb-tabset', () => {
 
     beforeEach(() => {
       TestBed.configureTestingModule(
-          {imports: [NgbTabsetModule], providers: [{provide: NgbTabsetConfig, useValue: config}]});
+          {imports: [NgbTabsetModule.forRoot()], providers: [{provide: NgbTabsetConfig, useValue: config}]});
     });
 
     it('should initialize inputs with provided config as provider', () => {

@@ -1,11 +1,17 @@
 import {NgbDate} from './ngb-date';
 import {Injectable} from '@angular/core';
+import {isNumber} from '../util/util';
 
 function fromJSDate(jsDate: Date) {
-  return new NgbDate(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate());
+  return new NgbDate(jsDate.getFullYear(), jsDate.getMonth() + 1, jsDate.getDate());
 }
 function toJSDate(date: NgbDate) {
-  return new Date(date.year, date.month, date.day);
+  const jsDate = new Date(date.year, date.month - 1, date.day);
+  // this is done avoid 30 -> 1930 conversion
+  if (!isNaN(jsDate.getTime())) {
+    jsDate.setFullYear(date.year);
+  }
+  return jsDate;
 }
 
 export type NgbPeriod = 'y' | 'm' | 'd';
@@ -23,13 +29,15 @@ export abstract class NgbCalendar {
   abstract getWeekNumber(week: NgbDate[], firstDayOfWeek: number): number;
 
   abstract getToday(): NgbDate;
+
+  abstract isValid(date: NgbDate): boolean;
 }
 
 @Injectable()
 export class NgbCalendarGregorian extends NgbCalendar {
   getDaysPerWeek() { return 7; }
 
-  getMonths() { return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]; }
+  getMonths() { return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]; }
 
   getWeeksPerMonth() { return 6; }
 
@@ -38,9 +46,9 @@ export class NgbCalendarGregorian extends NgbCalendar {
 
     switch (period) {
       case 'y':
-        return new NgbDate(date.year + number, 0, 1);
+        return new NgbDate(date.year + number, 1, 1);
       case 'm':
-        jsDate = new Date(date.year, date.month + number, 1);
+        jsDate = new Date(date.year, date.month + number - 1, 1);
         break;
       case 'd':
         jsDate.setDate(jsDate.getDate() + number);
@@ -56,10 +64,17 @@ export class NgbCalendarGregorian extends NgbCalendar {
 
   getWeekday(date: NgbDate) {
     let jsDate = toJSDate(date);
-    return jsDate.getDay();
+    let day = jsDate.getDay();
+    // in JS Date Sun=0, in ISO 8601 Sun=7
+    return day === 0 ? 7 : day;
   }
 
   getWeekNumber(week: NgbDate[], firstDayOfWeek: number) {
+    // in JS Date Sun=0, in ISO 8601 Sun=7
+    if (firstDayOfWeek === 7) {
+      firstDayOfWeek = 0;
+    }
+
     const thursdayIndex = (4 + 7 - firstDayOfWeek) % 7;
     let date = week[thursdayIndex];
 
@@ -72,4 +87,9 @@ export class NgbCalendarGregorian extends NgbCalendar {
   }
 
   getToday(): NgbDate { return fromJSDate(new Date()); }
+
+  isValid(date: NgbDate): boolean {
+    return date && isNumber(date.year) && isNumber(date.month) && isNumber(date.day) &&
+        !isNaN(toJSDate(date).getTime());
+  }
 }

@@ -9,14 +9,11 @@ import {NgbProgressbarConfig} from './progressbar-config';
   selector: 'ngb-progressbar',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <progress class="progress {{type ? 'progress-' + type : ''}}" 
-      [class.progress-animated]="animated" 
-      [class.progress-striped]="striped"
-      [max]="max" [value]="getValue()">
-      <div class="progress">
-        <span class="progress-bar" [style.width.%]="getPercentValue()"><ng-content></ng-content></span>
-      </div>
-    </progress>
+    <div class="progress">
+      <div class="progress-bar{{type ? ' bg-' + type : ''}}{{animated ? ' progress-bar-animated' : ''}}{{striped ? 
+    ' progress-bar-striped' : ''}}" role="progressbar" [style.width.%]="getPercentValue()" 
+    [attr.aria-valuenow]="getValue()" aria-valuemin="0" [attr.aria-valuemax]="max"></div>
+    </div>
   `
 })
 export class NgbProgressbar {
@@ -57,5 +54,3 @@ export class NgbProgressbar {
 
   getPercentValue() { return 100 * this.getValue() / this.max; }
 }
-
-export const NGB_PROGRESSBAR_DIRECTIVES = [NgbProgressbar];

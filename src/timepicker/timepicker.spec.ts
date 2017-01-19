@@ -76,7 +76,7 @@ describe('ngb-timepicker', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule(
-        {declarations: [TestComponent], imports: [NgbTimepickerModule, FormsModule, ReactiveFormsModule]});
+        {declarations: [TestComponent], imports: [NgbTimepickerModule.forRoot(), FormsModule, ReactiveFormsModule]});
   });
 
   describe('initialization', () => {
@@ -521,6 +521,36 @@ describe('ngb-timepicker', () => {
              });
        }));
 
+    it('should render 12 PM/AM as 12:mm and meridian button with proper value', async(() => {
+         const html = `<ngb-timepicker [(ngModel)]="model" [seconds]="true" [meridian]="true"></ngb-timepicker>`;
+
+         const fixture = createTestComponent(html);
+         fixture.componentInstance.model = {hour: 12, minute: 30, second: 0};
+         const meridianButton = getMeridianButton(fixture.nativeElement);
+         fixture.detectChanges();
+         fixture.whenStable()
+             .then(() => {
+               fixture.detectChanges();
+               return fixture.whenStable();
+             })
+             .then(() => {
+               expectToDisplayTime(fixture.nativeElement, '12:30:00');
+               expect(meridianButton.innerHTML).toBe('PM');
+
+               fixture.componentInstance.model = {hour: 0, minute: 30, second: 0};
+               fixture.detectChanges();
+               return fixture.whenStable();
+             })
+             .then(() => {
+               fixture.detectChanges();
+               return fixture.whenStable();
+             })
+             .then(() => {
+               expectToDisplayTime(fixture.nativeElement, '12:30:00');
+               expect(meridianButton.innerHTML).toBe('AM');
+             });
+       }));
+
     it('should update model on meridian click', async(() => {
          const html = `<ngb-timepicker [(ngModel)]="model" [seconds]="true" [meridian]="true"></ngb-timepicker>`;
 
@@ -828,7 +858,7 @@ describe('ngb-timepicker', () => {
     let config: NgbTimepickerConfig;
 
     beforeEach(() => {
-      TestBed.configureTestingModule({imports: [NgbTimepickerModule]});
+      TestBed.configureTestingModule({imports: [NgbTimepickerModule.forRoot()]});
       TestBed.overrideComponent(NgbTimepicker, {set: {template: ''}});
     });
 
@@ -851,7 +881,7 @@ describe('ngb-timepicker', () => {
 
     beforeEach(() => {
       TestBed.configureTestingModule(
-          {imports: [NgbTimepickerModule], providers: [{provide: NgbTimepickerConfig, useValue: config}]});
+          {imports: [NgbTimepickerModule.forRoot()], providers: [{provide: NgbTimepickerConfig, useValue: config}]});
     });
 
     it('should initialize inputs with provided config as provider', () => {

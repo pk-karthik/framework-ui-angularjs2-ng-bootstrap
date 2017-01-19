@@ -1,13 +1,10 @@
 var gulp = require('gulp');
-var ts = require('gulp-typescript');
 var gutil = require('gulp-util');
-var sourcemaps = require('gulp-sourcemaps');
 var ddescribeIit = require('gulp-ddescribe-iit');
 var shell = require('gulp-shell');
 var ghPages = require('gulp-gh-pages');
 var gulpFile = require('gulp-file');
 var del = require('del');
-var merge = require('merge2');
 var clangFormat = require('clang-format');
 var gulpFormat = require('gulp-clang-format');
 var runSequence = require('run-sequence');
@@ -15,7 +12,9 @@ var tslint = require('gulp-tslint');
 var webpack = require('webpack');
 var typescript = require('typescript');
 var exec = require('child_process').exec;
-var isWin = /^win/.test(process.platform);
+var path = require('path');
+var os = require('os');
+var remapIstanbul = require('remap-istanbul/lib/gulpRemapIstanbul');
 
 var PATHS = {
   src: 'src/**/*.ts',
@@ -26,13 +25,18 @@ var PATHS = {
   demoDist: 'demo/dist/**/*',
   typings: 'typings/index.d.ts',
   jasmineTypings: 'typings/globals/jasmine/index.d.ts',
-  demoApiDocs: 'demo/src'
+  demoApiDocs: 'demo/src',
+  coverageJson: 'coverage/json/coverage-final.json'
 };
+
+function platformPath(path) {
+  return /^win/.test(os.platform()) ? `${path}.cmd` : path;
+}
 
 function webpackCallBack(taskName, gulpDone) {
   return function(err, stats) {
     if (err) throw new gutil.PluginError(taskName, err);
-    gutil.log("[" + taskName + "]", stats.toString());
+    gutil.log(`[${taskName}]`, stats.toString());
     gulpDone();
   }
 }
@@ -42,7 +46,7 @@ function webpackCallBack(taskName, gulpDone) {
 gulp.task('clean:build', function() { return del('dist/'); });
 
 gulp.task('ngc', function(cb) {
-  var executable = isWin ? 'node_modules\\.bin\\ngc.cmd' : './node_modules/.bin/ngc';
+  var executable = path.join(__dirname, platformPath('/node_modules/.bin/ngc'));
   exec(`${executable} -p ./tsconfig-es2015.json`, (e) => {
     if (e) console.log(e);
     del('./dist/waste');
@@ -52,8 +56,19 @@ gulp.task('ngc', function(cb) {
 
 gulp.task('umd', function(cb) {
   function ngExternal(ns) {
-    var ng2Ns = '@angular/' + ns;
+    var ng2Ns = `@angular/${ns}`;
     return {root: ['ng', ns], commonjs: ng2Ns, commonjs2: ng2Ns, amd: ng2Ns};
+  }
+
+  function rxjsExternal(context, request, cb) {
+    if (/^rxjs\/add\/observable\//.test(request)) {
+      return cb(null, {root: ['Rx', 'Observable'], commonjs: request, commonjs2: request, amd: request});
+    } else if (/^rxjs\/add\/operator\//.test(request)) {
+      return cb(null, {root: ['Rx', 'Observable', 'prototype'], commonjs: request, commonjs2: request, amd: request});
+    } else if (/^rxjs\//.test(request)) {
+      return cb(null, {root: ['Rx'], commonjs: request, commonjs2: request, amd: request});
+    }
+    cb();
   }
 
   webpack(
@@ -61,19 +76,14 @@ gulp.task('umd', function(cb) {
         entry: './temp/index.js',
         output: {filename: 'dist/bundles/ng-bootstrap.js', library: 'ngb', libraryTarget: 'umd'},
         devtool: 'source-map',
-        externals: {
-          '@angular/core': ngExternal('core'),
-          '@angular/common': ngExternal('common'),
-          '@angular/forms': ngExternal('forms'),
-          'rxjs/Rx': {root: 'Rx', commonjs: 'rxjs/Rx', commonjs2: 'rxjs/Rx', amd: 'rxjs/Rx'},
-          // 'rxjs/add/operator/let': 'rxjs/add/operator/let'
-          'rxjs/add/operator/let': {
-            root: ['Rx', 'Observable', 'prototype'],
-            commonjs: 'rxjs/add/operator/let',
-            commonjs2: 'rxjs/add/operator/let',
-            amd: 'rxjs/add/operator/let'
-          }
-        }
+        externals: [
+          {
+            '@angular/core': ngExternal('core'),
+            '@angular/common': ngExternal('common'),
+            '@angular/forms': ngExternal('forms')
+          },
+          rxjsExternal
+        ]
       },
       webpackCallBack('webpack', cb));
 });
@@ -93,7 +103,7 @@ gulp.task('npm', function() {
 
   targetPkgJson.peerDependencies = {};
   Object.keys(pkgJson.dependencies).forEach(function(dependency) {
-    targetPkgJson.peerDependencies[dependency] = '^' + pkgJson.dependencies[dependency];
+    targetPkgJson.peerDependencies[dependency] = `^${pkgJson.dependencies[dependency]}`;
   });
 
   return gulp.src('README.md')
@@ -114,13 +124,11 @@ gulp.task('changelog', function() {
 
 // Testing
 
-var testProject = ts.createProject('tsconfig.json', {typescript: typescript});
-
 function startKarmaServer(isTddMode, isSaucelabs, done) {
   var karmaServer = require('karma').Server;
   var travis = process.env.TRAVIS;
 
-  var config = {configFile: __dirname + '/karma.conf.js', singleRun: !isTddMode, autoWatch: isTddMode};
+  var config = {configFile: `${__dirname}/karma.conf.js`, singleRun: !isTddMode, autoWatch: isTddMode};
 
   if (travis) {
     config['reporters'] = ['dots'];
@@ -129,10 +137,11 @@ function startKarmaServer(isTddMode, isSaucelabs, done) {
 
   if (isSaucelabs) {
     config['reporters'] = ['dots', 'saucelabs'];
-    config['browsers'] = ['SL_CHROME', 'SL_FIREFOX', 'SL_IE9', 'SL_IE10', 'SL_IE11', 'SL_EDGE', 'SL_SAFARI9'];
+    config['browsers'] =
+        ['SL_CHROME', 'SL_FIREFOX', 'SL_IE10', 'SL_IE11', 'SL_EDGE13', 'SL_EDGE14', 'SL_SAFARI9', 'SL_SAFARI10'];
 
     if (process.env.TRAVIS) {
-      var buildId = 'TRAVIS #' + process.env.TRAVIS_BUILD_NUMBER + ' (' + process.env.TRAVIS_BUILD_ID + ')';
+      var buildId = `TRAVIS #${process.env.TRAVIS_BUILD_NUMBER} (${process.env.TRAVIS_BUILD_ID})`;
       config['sauceLabs'] = {build: buildId, tunnelIdentifier: process.env.TRAVIS_JOB_NUMBER};
       process.env.SAUCE_ACCESS_KEY = process.env.SAUCE_ACCESS_KEY.split('').reverse().join('');
     }
@@ -141,31 +150,47 @@ function startKarmaServer(isTddMode, isSaucelabs, done) {
   new karmaServer(config, done).start();
 }
 
-gulp.task('clean:tests', function() { return del('temp/'); });
+gulp.task('clean:tests', function() { return del(['temp/', 'coverage/']); });
 
-gulp.task('build:tests', function() {
-  var tsResult = gulp.src([PATHS.src, PATHS.typings]).pipe(sourcemaps.init()).pipe(ts(testProject));
-
-  return tsResult.js.pipe(sourcemaps.write('.')).pipe(gulp.dest('temp'));
+gulp.task('build:tests', ['clean:tests'], (cb) => {
+  exec(path.join(__dirname, platformPath('/node_modules/.bin/tsc')), (e) => {
+    if (e) console.log(e);
+    cb();
+  }).stdout.on('data', function(data) { console.log(data); });
 });
-
-gulp.task('clean:build-tests', function(done) { runSequence('clean:tests', 'build:tests', done); });
 
 gulp.task(
     'ddescribe-iit', function() { return gulp.src(PATHS.specs).pipe(ddescribeIit({allowDisabledTests: false})); });
 
-gulp.task('test', ['clean:build-tests'], function(done) { startKarmaServer(false, false, done); });
-
-gulp.task('tdd', ['clean:build-tests'], function(done) {
-  startKarmaServer(true, false, function(err) {
-    done(err);
-    process.exit(1);
+gulp.task('test', ['build:tests'], function() {
+  startKarmaServer(false, false, () => {
+    return gulp.src(PATHS.coverageJson).pipe(remapIstanbul({reports: {'html': 'coverage/html'}}));
   });
-
-  gulp.watch(PATHS.src, ['build:tests']);
 });
 
-gulp.task('saucelabs', ['clean:build-tests'], function(done) {
+gulp.task('remap-coverage', function() {
+  return gulp.src(PATHS.coverageJson).pipe(remapIstanbul({reports: {'html': 'coverage/html'}}));
+});
+
+gulp.task('tdd', ['clean:tests'], (cb) => {
+  var executable = path.join(__dirname, platformPath('/node_modules/.bin/tsc'));
+  var startedKarma = false;
+
+  exec(`${executable} -w`, (e) => {
+    cb(e && e.signal !== 'SIGINT' ? e : undefined);
+  }).stdout.on('data', function(data) {
+
+    console.log(data);
+
+    // starting karma in tdd as soon as 'tsc -w' finishes first compilation
+    if (!startedKarma) {
+      startedKarma = true;
+      startKarmaServer(true, false, function(err) { process.exit(err ? 1 : 0); });
+    }
+  });
+});
+
+gulp.task('saucelabs', ['build:tests'], function(done) {
   startKarmaServer(false, true, function(err) {
     done(err);
     process.exit(err ? 1 : 0);
@@ -210,16 +235,31 @@ gulp.task('generate-docs', function() {
   return gulpFile('api-docs.ts', docs, {src: true}).pipe(gulp.dest(PATHS.demoApiDocs));
 });
 
+gulp.task('generate-plunks', function() {
+  var getPlunker = require('./misc/plunk-gen');
+  var demoGenUtils = require('./misc/demo-gen-utils');
+  var plunks = [];
+
+  demoGenUtils.getDemoComponentNames().forEach(function(componentName) {
+    plunks = plunks.concat(demoGenUtils.getDemoNames(componentName).reduce(function(soFar, demoName) {
+      soFar.push({name: `${componentName}/demos/${demoName}/plnkr.html`, source: getPlunker(componentName, demoName)});
+      return soFar;
+    }, []));
+  });
+
+  return gulpFile(plunks, {src: true}).pipe(gulp.dest('demo/src/public/app/components'));
+});
+
 gulp.task('clean:demo', function() { return del('demo/dist'); });
 
 gulp.task('clean:demo-cache', function() { return del('.publish/'); });
 
 gulp.task(
-    'demo-server', ['generate-docs'],
-    shell.task(['webpack-dev-server --port 9090 --config webpack.demo.js --hot --inline --progress']));
+    'demo-server', ['generate-docs', 'generate-plunks'],
+    shell.task(['webpack-dev-server --port 9090 --config webpack.demo.js --inline --progress']));
 
 gulp.task(
-    'build:demo', ['clean:demo', 'generate-docs'],
+    'build:demo', ['clean:demo', 'generate-docs', 'generate-plunks'],
     shell.task(['MODE=build webpack --config webpack.demo.js --progress --profile --bail']));
 
 gulp.task('demo-push', function() {

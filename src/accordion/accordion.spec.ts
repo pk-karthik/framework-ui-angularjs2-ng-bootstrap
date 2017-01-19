@@ -1,4 +1,5 @@
 import {TestBed, ComponentFixture, inject} from '@angular/core/testing';
+import {By} from '@angular/platform-browser';
 import {createGenericTestComponent} from '../test/common';
 
 import {Component} from '@angular/core';
@@ -30,10 +31,18 @@ function expectOpenPanels(nativeEl: HTMLElement, openPanelsDef: boolean[]) {
   expect(result).toEqual(openPanelsDef);
 }
 
+function expectAriaSelected(nativeEl: HTMLElement, ariaSelectedPanelsDef: boolean[]) {
+  const panels = getPanels(nativeEl);
+  expect(panels.length).toBe(ariaSelectedPanelsDef.length);
+
+  const result = panels.map(panel => (panel.getAttribute('aria-selected') === 'true'));
+  expect(result).toEqual(ariaSelectedPanelsDef);
+}
+
 describe('ngb-accordion', () => {
   let html = `
     <ngb-accordion #acc="ngbAccordion" [closeOthers]="closeOthers" [activeIds]="activeIds"
-      (change)="changeCallback($event)" [type]="classType">
+      (panelChange)="changeCallback($event)" [type]="classType">
       <ngb-panel *ngFor="let panel of panels" [id]="panel.id" [disabled]="panel.disabled" [type]="panel.type">
         <template ngbPanelTitle>{{panel.title}}</template>
         <template ngbPanelContent>{{panel.content}}</template>
@@ -43,7 +52,7 @@ describe('ngb-accordion', () => {
   `;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({declarations: [TestComponent], imports: [NgbAccordionModule]});
+    TestBed.configureTestingModule({declarations: [TestComponent], imports: [NgbAccordionModule.forRoot()]});
     TestBed.overrideComponent(TestComponent, {set: {template: html}});
   });
 
@@ -56,8 +65,13 @@ describe('ngb-accordion', () => {
 
   it('should have no open panels', () => {
     const fixture = TestBed.createComponent(TestComponent);
+    const accordionEl = fixture.nativeElement.children[0];
+    const el = fixture.nativeElement;
     fixture.detectChanges();
-    expectOpenPanels(fixture.nativeElement, [false, false, false]);
+    expectOpenPanels(el, [false, false, false]);
+    expectAriaSelected(el, [false, false, false]);
+    expect(accordionEl.getAttribute('role')).toBe('tablist');
+    expect(accordionEl.getAttribute('aria-multiselectable')).toBe('true');
   });
 
   it('should toggle panels based on "activeIds" values', () => {
@@ -140,6 +154,8 @@ describe('ngb-accordion', () => {
     const el = fixture.nativeElement;
 
     tc.closeOthers = true;
+    fixture.detectChanges();
+    expect(el.children[0].getAttribute('aria-multiselectable')).toBe('false');
 
     getButton(el, 0).click();
     fixture.detectChanges();
@@ -313,10 +329,36 @@ describe('ngb-accordion', () => {
     expect(el[2]).toHaveCssClass('card-warning');
   });
 
+  it('should toggle aria-selected attribute of the focused panel', () => {
+    const fixture = TestBed.createComponent(TestComponent);
+    fixture.detectChanges();
+
+    const headingLinks = fixture.debugElement.queryAll(By.css('.card-header a'));
+
+    headingLinks[0].triggerEventHandler('focus', {});
+    fixture.detectChanges();
+    expectAriaSelected(fixture.nativeElement, [true, false, false]);
+
+    headingLinks[0].triggerEventHandler('blur', {});
+    headingLinks[1].triggerEventHandler('focus', {});
+    fixture.detectChanges();
+    expectAriaSelected(fixture.nativeElement, [false, true, false]);
+
+    headingLinks[1].triggerEventHandler('blur', {});
+    headingLinks[2].triggerEventHandler('focus', {});
+    fixture.detectChanges();
+    expectAriaSelected(fixture.nativeElement, [false, false, true]);
+
+    headingLinks[2].triggerEventHandler('blur', {});
+    headingLinks[1].triggerEventHandler('focus', {});
+    fixture.detectChanges();
+    expectAriaSelected(fixture.nativeElement, [false, true, false]);
+  });
+
   describe('Custom config', () => {
     let config: NgbAccordionConfig;
 
-    beforeEach(() => { TestBed.configureTestingModule({imports: [NgbAccordionModule]}); });
+    beforeEach(() => { TestBed.configureTestingModule({imports: [NgbAccordionModule.forRoot()]}); });
 
     beforeEach(inject([NgbAccordionConfig], (c: NgbAccordionConfig) => {
       config = c;
@@ -341,7 +383,7 @@ describe('ngb-accordion', () => {
 
     beforeEach(() => {
       TestBed.configureTestingModule(
-          {imports: [NgbAccordionModule], providers: [{provide: NgbAccordionConfig, useValue: config}]});
+          {imports: [NgbAccordionModule.forRoot()], providers: [{provide: NgbAccordionConfig, useValue: config}]});
     });
 
     it('should initialize inputs with provided config as provider', () => {

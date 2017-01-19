@@ -79,17 +79,17 @@ export interface NgbTabChangeEvent {
   selector: 'ngb-tabset',
   exportAs: 'ngbTabset',
   template: `
-    <ul [class]="'nav nav-' + type" role="tablist">
+    <ul [class]="'nav nav-' + type + ' justify-content-' + justify" role="tablist">
       <li class="nav-item" *ngFor="let tab of tabs">
-        <a [id]="tab.id" class="nav-link" [class.active]="tab.id === activeId" [class.disabled]="tab.disabled" 
-          href (click)="!!select(tab.id)">
+        <a [id]="tab.id" class="nav-link" [class.active]="tab.id === activeId" [class.disabled]="tab.disabled"
+          href (click)="!!select(tab.id)" role="tab" [attr.aria-controls]="tab.id + '-panel'" [attr.aria-expanded]="tab.id === activeId">
           {{tab.title}}<template [ngTemplateOutlet]="tab.titleTpl?.templateRef"></template>
         </a>
       </li>
     </ul>
     <div class="tab-content">
       <template ngFor let-tab [ngForOf]="tabs">
-        <div class="tab-pane active" *ngIf="tab.id === activeId" role="tabpanel" [attr.aria-labelledby]="tab.id">
+        <div class="tab-pane active" *ngIf="tab.id === activeId" role="tabpanel" [attr.aria-labelledby]="tab.id" id="{{tab.id}}-panel">
           <template [ngTemplateOutlet]="tab.contentTpl.templateRef"></template>
         </div>
       </template>
@@ -100,9 +100,14 @@ export class NgbTabset implements AfterContentChecked {
   @ContentChildren(NgbTab) tabs: QueryList<NgbTab>;
 
   /**
-   * An identifier of a tab that should be selected (active).
+   * An identifier of an initially selected (active) tab. Use the "select" method to switch a tab programmatically.
    */
   @Input() activeId: string;
+
+  /**
+   * The horizontal alignment of the nav with flexbox utilities. Can be one of 'start', 'center' or 'end'
+   */
+  @Input() justify: 'start' | 'center' | 'end';
 
   /**
    * Type of navigation to be used for tabs. Can be one of 'tabs' or 'pills'.
@@ -112,9 +117,12 @@ export class NgbTabset implements AfterContentChecked {
   /**
    * A tab change event fired right before the tab selection happens. See NgbTabChangeEvent for payload details
    */
-  @Output() change = new EventEmitter<NgbTabChangeEvent>();
+  @Output() tabChange = new EventEmitter<NgbTabChangeEvent>();
 
-  constructor(config: NgbTabsetConfig) { this.type = config.type; }
+  constructor(config: NgbTabsetConfig) {
+    this.type = config.type;
+    this.justify = config.justify;
+  }
 
   /**
    * Selects the tab with the given id and shows its associated pane.
@@ -125,7 +133,7 @@ export class NgbTabset implements AfterContentChecked {
     if (selectedTab && !selectedTab.disabled && this.activeId !== selectedTab.id) {
       let defaultPrevented = false;
 
-      this.change.emit(
+      this.tabChange.emit(
           {activeId: this.activeId, nextId: selectedTab.id, preventDefault: () => { defaultPrevented = true; }});
 
       if (!defaultPrevented) {
@@ -145,5 +153,3 @@ export class NgbTabset implements AfterContentChecked {
     return tabsWithId.length ? tabsWithId[0] : null;
   }
 }
-
-export const NGB_TABSET_DIRECTIVES = [NgbTabset, NgbTab, NgbTabContent, NgbTabTitle];
